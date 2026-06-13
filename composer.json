@@ -1,0 +1,44 @@
+{
+    "name": "averyhabbott/librenms-windows-dhcp",
+    "description": "LibreNMS plugin package: monitor Windows DHCP server and scope health via PowerShell Universal (no SNMP).",
+    "type": "library",
+    "license": "GPL-3.0-or-later",
+    "keywords": [
+        "librenms",
+        "dhcp",
+        "windows",
+        "monitoring",
+        "powershell-universal",
+        "plugin"
+    ],
+    "homepage": "https://github.com/averyhabbott/librenms-windows-dhcp",
+    "authors": [
+        {
+            "name": "Avery Abbott",
+            "homepage": "https://github.com/averyhabbott"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/averyhabbott/librenms-windows-dhcp/issues",
+        "source": "https://github.com/averyhabbott/librenms-windows-dhcp"
+    },
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "AveryAbbott\\WindowsDhcp\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "AveryAbbott\\WindowsDhcp\\WindowsDhcpServiceProvider"
+            ]
+        },
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    },
+    "minimum-stability": "stable"
+}

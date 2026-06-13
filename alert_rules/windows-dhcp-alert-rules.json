@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Windows DHCP scope utilization warning",
+    "severity": "warning",
+    "builder": {"condition":"AND","rules":[{"id":"dhcp_scopes.percent_in_use","field":"dhcp_scopes.percent_in_use","type":"string","input":"text","operator":"greater_or_equal","value":"80"},{"id":"dhcp_scopes.percent_in_use","field":"dhcp_scopes.percent_in_use","type":"string","input":"text","operator":"less","value":"95"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  },
+  {
+    "name": "Windows DHCP scope utilization critical",
+    "severity": "critical",
+    "builder": {"condition":"AND","rules":[{"id":"dhcp_scopes.percent_in_use","field":"dhcp_scopes.percent_in_use","type":"string","input":"text","operator":"greater_or_equal","value":"95"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  },
+  {
+    "name": "Windows DHCP server not responding (no ACKs)",
+    "severity": "critical",
+    "extra": "{\"count\": 3}",
+    "notes": "DHCP ACK rate has dropped to zero while the device is up.",
+    "builder": {"condition":"AND","rules":[{"id":"sensors.sensor_descr","field":"sensors.sensor_descr","type":"string","input":"text","operator":"equal","value":"DHCP Acks/sec"},{"id":"sensors.sensor_current","field":"sensors.sensor_current","type":"string","input":"text","operator":"equal","value":"0"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  },
+  {
+    "name": "Windows DHCP PSU API unreachable",
+    "severity": "critical",
+    "notes": "Device responds to ICMP but its PowerShell Universal API is not answering.",
+    "builder": {"condition":"AND","rules":[{"id":"sensors.sensor_descr","field":"sensors.sensor_descr","type":"string","input":"text","operator":"equal","value":"DHCP PSU API Reachable"},{"id":"sensors.sensor_current","field":"sensors.sensor_current","type":"string","input":"text","operator":"equal","value":"0"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  },
+  {
+    "name": "Windows DHCP failover not normal",
+    "severity": "warning",
+    "builder": {"condition":"AND","rules":[{"id":"sensors.sensor_type","field":"sensors.sensor_type","type":"string","input":"text","operator":"equal","value":"failover"},{"id":"sensors.sensor_current","field":"sensors.sensor_current","type":"string","input":"text","operator":"less","value":"1"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  }
+]
