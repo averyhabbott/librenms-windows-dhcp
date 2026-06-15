@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use LibreNMS\RRD\RrdDefinition;
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
+use AveryAbbott\WindowsDhcp\Settings;
 
 /**
  * Polls every device that has a `dhcp_psu_url` attribute by calling the
@@ -29,8 +30,13 @@ class PollDhcpCommand extends Command
     private const POLLER_TYPE = 'dhcp';
     private const HTTP_TIMEOUT = 30;
 
+    /** @var array merged plugin settings (thresholds, http timeout, ...) */
+    private array $settings = [];
+
     public function handle(): int
     {
+        $this->settings = Settings::load();
+
         $query = Device::whereHas('attribs', fn ($q) => $q->where('attrib_type', 'dhcp_psu_url'));
 
         if ($device = $this->option('device')) {
@@ -90,7 +96,7 @@ class PollDhcpCommand extends Command
         $caTempFile = is_string($verify) ? $verify : null;
 
         try {
-            $request = Http::timeout(self::HTTP_TIMEOUT)
+            $request = Http::timeout($this->settings['http_timeout'] ?? self::HTTP_TIMEOUT)
                 ->withOptions(['verify' => $verify])
                 ->acceptJson();
 
@@ -160,6 +166,10 @@ class PollDhcpCommand extends Command
 
             $inUse = (int) ($s['addresses_in_use'] ?? 0);
             $free = (int) ($s['addresses_free'] ?? 0);
+            $pending = (int) ($s['pending_offers'] ?? 0);
+            // Conflicting addresses (BAD_ADDRESS / declined). Defaults to 0 when the
+            // PSU endpoint predates this field, so older endpoints stay compatible.
+            $bad = (int) ($s['bad_address_count'] ?? 0);
 
             DhcpScope::updateOrCreate(
                 ['device_id' => $device->device_id, 'scope_id' => $scopeId],
@@ -170,7 +180,8 @@ class PollDhcpCommand extends Command
                     'addresses_in_use' => $inUse,
                     'addresses_free' => $free,
                     'addresses_reserved' => (int) ($s['addresses_reserved'] ?? 0),
-                    'pending_offers' => (int) ($s['pending_offers'] ?? 0),
+                    'pending_offers' => $pending,
+                    'bad_addresses' => $bad,
                     'percent_in_use' => round((float) ($s['percent_in_use'] ?? 0), 2),
                 ]
             );
@@ -179,8 +190,9 @@ class PollDhcpCommand extends Command
                 RrdDefinition::make()
                     ->addDataset('inuse', 'GAUGE', 0)
                     ->addDataset('free', 'GAUGE', 0)
-                    ->addDataset('pending', 'GAUGE', 0),
-                ['inuse' => $inUse, 'free' => $free, 'pending' => (int) ($s['pending_offers'] ?? 0)]
+                    ->addDataset('pending', 'GAUGE', 0)
+                    ->addDataset('bad', 'GAUGE', 0),
+                ['inuse' => $inUse, 'free' => $free, 'pending' => $pending, 'bad' => $bad]
             );
         }
 
@@ -221,7 +233,8 @@ class PollDhcpCommand extends Command
 
         if ($server) {
             $specs[] = ['percent', 'utilization', 'utilization', 'DHCP Address Utilization',
-                round((float) ($server['percent_in_use'] ?? 0), 2), 95, 80, null, null];
+                round((float) ($server['percent_in_use'] ?? 0), 2),
+                $this->settings['util_crit'] ?? 95, $this->settings['util_warn'] ?? 80, null, null];
             $specs[] = ['count', 'addresses', 'addresses_in_use', 'DHCP Addresses In Use',
                 (int) ($server['addresses_in_use'] ?? 0), null, null, null, null];
             $specs[] = ['count', 'scopes', 'scopes_active', 'DHCP Active Scopes',
@@ -233,6 +246,15 @@ class PollDhcpCommand extends Command
                     (int) $server['uptime_seconds'], null, null, null, null];
             }
         }
+
+        // Address conflicts (BAD_ADDRESS / declined) summed across all scopes, so
+        // it's graphable + alertable on the Health tab. 0 when no scope reports any.
+        $badTotal = array_sum(array_map(
+            fn ($s) => (int) ($s['bad_address_count'] ?? 0),
+            $data['scopes'] ?? []
+        ));
+        $specs[] = ['count', 'bad_addresses', 'bad_addresses', 'DHCP Bad Addresses',
+            $badTotal, null, null, null, null];
 
         // Packet rates (per second); created during first poll without a value.
         foreach (['discovers', 'offers', 'requests', 'acks', 'nacks', 'declines', 'releases'] as $pkt) {

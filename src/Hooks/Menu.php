@@ -3,13 +3,14 @@
 namespace AveryAbbott\WindowsDhcp\Hooks;
 
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
+use AveryAbbott\WindowsDhcp\Settings;
 use App\Plugins\Hooks\MenuEntryHook;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
  * Adds a "DHCP Scopes" entry to the navbar "Plugins" submenu, badged with the
- * number of scopes at/over 95% utilization so the alarm count is visible
- * from any page.
+ * number of scopes at/over the configured critical utilization threshold so the
+ * alarm count is visible from any page.
  */
 class Menu extends MenuEntryHook
 {
@@ -21,10 +22,12 @@ class Menu extends MenuEntryHook
         return $user->can('global-read');
     }
 
-    public function data(): array
+    public function data(array $settings = []): array
     {
+        $critThreshold = Settings::merge($settings)['util_crit'];
+
         return [
-            'critical' => DhcpScope::where('percent_in_use', '>=', 95)->count(),
+            'critical' => DhcpScope::where('percent_in_use', '>=', $critThreshold)->count(),
         ];
     }
 }

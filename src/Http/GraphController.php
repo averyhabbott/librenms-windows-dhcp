@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use LibreNMS\Exceptions\RrdGraphException;
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
+use AveryAbbott\WindowsDhcp\Settings;
 
 /**
  * Renders a per-scope utilization graph (in-use / free / pending) straight from
@@ -29,6 +30,19 @@ class GraphController extends Controller
         $safe = preg_replace('/[^A-Za-z0-9_]/', '_', (string) $dhcpScope->scope_id);
         $rrd = Rrd::name($device->hostname, ['dhcp-scope', $safe]);
 
+        $settings = Settings::load();
+        $datasets = $settings['graph_datasets'];   // subset of inuse/free/pending/bad, canonical order
+        $stacked = $settings['graph_stacked'];
+
+        // pool=true series can be stacked into a filled area (they sum to the pool);
+        // pending/bad are always lines (they're not part of the in-use/free total).
+        $meta = [
+            'inuse' => ['color' => '#cc0000', 'label' => 'In Use ', 'pool' => true],
+            'free' => ['color' => '#3da233', 'label' => 'Free   ', 'pool' => true],
+            'pending' => ['color' => '#0000ff', 'label' => 'Pending', 'pool' => false],
+            'bad' => ['color' => '#ff8c00', 'label' => 'Bad    ', 'pool' => false],
+        ];
+
         $options = [
             '--start', $from,
             '--end', $to,
@@ -37,25 +51,45 @@ class GraphController extends Controller
             '--imgformat=PNG',
             '--lower-limit=0',
             '--title=' . $dhcpScope->scope_id . ' addresses',
-            "DEF:inuse=$rrd:inuse:AVERAGE",
-            "DEF:free=$rrd:free:AVERAGE",
-            "DEF:pending=$rrd:pending:AVERAGE",
-            'CDEF:total=inuse,free,+',
-            'AREA:inuse#cc0000:In Use ',
-            'GPRINT:inuse:LAST:Cur\: %6.0lf',
-            'GPRINT:inuse:MAX:Max\: %6.0lf\n',
-            'STACK:free#3da233:Free   ',
-            'GPRINT:free:LAST:Cur\: %6.0lf',
-            'GPRINT:free:MAX:Max\: %6.0lf\n',
-            'LINE1:pending#0000ff:Pending',
-            'GPRINT:pending:LAST:Cur\: %6.0lf',
-            'GPRINT:pending:MAX:Max\: %6.0lf\n',
         ];
+
+        // Optionally pin the y-axis to the scope's full address pool so the graph
+        // shows fullness to scale (and is comparable across scopes) instead of
+        // auto-zooming to the data range. Skip when the total is unknown (0) —
+        // a rigid 0..0 axis would render an empty/broken graph.
+        if ($settings['graph_scale_to_size'] && $dhcpScope->addresses_total > 0) {
+            $options[] = '--upper-limit=' . (int) $dhcpScope->addresses_total;
+            $options[] = '--rigid';
+        }
+
+        foreach ($datasets as $ds) {
+            $options[] = "DEF:$ds=$rrd:$ds:AVERAGE";
+        }
+
+        $poolStarted = false;
+        foreach ($datasets as $ds) {
+            $m = $meta[$ds];
+            if ($stacked && $m['pool']) {
+                $options[] = ($poolStarted ? 'STACK:' : 'AREA:') . "{$ds}{$m['color']}:{$m['label']}";
+                $poolStarted = true;
+            } else {
+                $options[] = 'LINE' . ($ds === 'bad' ? '2' : '1') . ":{$ds}{$m['color']}:{$m['label']}";
+            }
+            $options[] = "GPRINT:$ds:LAST:Cur\\: %6.0lf";
+            $options[] = "GPRINT:$ds:MAX:Max\\: %6.0lf\\n";
+        }
 
         try {
             $image = Rrd::graph($options);
 
-            return response($image, 200, ['Content-Type' => 'image/png']);
+            // No explicit cache headers — same as core LibreNMS graphs (graph.inc.php
+            // sets only Content-type). Caching is keyed in the URL instead: callers
+            // append a `cb` token (5-minute time bucket + a settings fingerprint, see
+            // Settings::graphCacheToken) so the browser reuses the PNG within a poll
+            // window but refetches the instant settings change or new data lands.
+            return response($image, 200, [
+                'Content-Type' => 'image/png',
+            ]);
         } catch (RrdGraphException $e) {
             return response($e->generateErrorImage(), 500, ['Content-Type' => 'image/png']);
         }

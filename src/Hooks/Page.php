@@ -5,6 +5,7 @@ namespace AveryAbbott\WindowsDhcp\Hooks;
 use App\Models\Device;
 use App\Plugins\Hooks\PageHook;
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
+use AveryAbbott\WindowsDhcp\Settings;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
 
@@ -24,10 +25,11 @@ class Page extends PageHook
         return $user->can('global-read');
     }
 
-    public function data(): array
+    public function data(array $settings = []): array
     {
-        // PageHook::data() takes no parameters; read the request/user via helpers
-        // (mirrors core's ExamplePlugin, and keeps the override signature compatible).
+        // The PluginManager injects the plugin's stored settings here.
+        $settings = Settings::merge($settings);
+
         $request = request();
         $user = $request->user();
 
@@ -47,6 +49,9 @@ class Page extends PageHook
             'title' => 'Windows DHCP Scopes',
             'devices' => $devices,
             'selectedDevice' => $request->integer('device') ?: null,
+            'utilWarn' => $settings['util_warn'],
+            'utilCrit' => $settings['util_crit'],
+            'graphCacheKey' => Settings::graphCacheToken(),
         ];
     }
 }

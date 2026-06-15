@@ -30,6 +30,7 @@ class DhcpScope extends Model
         'addresses_free',
         'addresses_reserved',
         'pending_offers',
+        'bad_addresses',
         'percent_in_use',
     ];
 
@@ -41,6 +42,7 @@ class DhcpScope extends Model
             'addresses_free' => 'integer',
             'addresses_reserved' => 'integer',
             'pending_offers' => 'integer',
+            'bad_addresses' => 'integer',
             'percent_in_use' => 'float',
         ];
     }

@@ -10,6 +10,7 @@ use AveryAbbott\WindowsDhcp\Console\PollDhcpCommand;
 use AveryAbbott\WindowsDhcp\Hooks\DeviceOverview;
 use AveryAbbott\WindowsDhcp\Hooks\Menu;
 use AveryAbbott\WindowsDhcp\Hooks\Page;
+use AveryAbbott\WindowsDhcp\Hooks\Settings;
 
 class WindowsDhcpServiceProvider extends ServiceProvider
 {
@@ -36,7 +37,7 @@ class WindowsDhcpServiceProvider extends ServiceProvider
         // never break the whole LibreNMS boot.
         try {
             $manager = $this->app->make(PluginManagerInterface::class);
-            foreach ([DeviceOverview::class, Page::class, Menu::class] as $hook) {
+            foreach ([DeviceOverview::class, Page::class, Menu::class, Settings::class] as $hook) {
                 $manager->publishHook(self::PLUGIN_NAME, $this->hookType($hook), $hook);
             }
         } catch (\Throwable $e) {

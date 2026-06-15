@@ -50,10 +50,15 @@ class ConfigureCommand extends Command
             return self::SUCCESS;
         }
 
+        // dhcp_psu_url is the marker the poller discovers devices by, so it must
+        // always be set. When --url isn't given, build the default from the
+        // hostname and --port.
+        $port = (string) $this->option('port');
         if ($url = $this->option('url')) {
             $device->setAttrib('dhcp_psu_url', rtrim($url, '/'));
         } else {
-            $device->setAttrib('dhcp_psu_port', (string) $this->option('port'));
+            $device->setAttrib('dhcp_psu_port', $port);
+            $device->setAttrib('dhcp_psu_url', "https://{$device->hostname}:{$port}/api/dhcp");
         }
 
         if ($token = $this->option('token')) {

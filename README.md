@@ -18,10 +18,11 @@ Per poll (every 5 min) it calls `GET /api/dhcp/metrics` on each DHCP server and 
 - **Per-scope** → `dhcp_scopes` table + per-scope RRD, browsable on a dedicated
   **"DHCP Scopes" plugin page** (navbar → **Plugins → DHCP Scopes**): a server-side
   paginated/searchable table that scales to thousands of scopes across all servers
-  (utilization, in-use/free/reserved/pending, state), with an **on-demand** history
-  graph per scope (served by the package's own route — no core graph files). The device
-  **Overview tab** carries a compact summary (scope counts, ≥80% / ≥95% tallies, busiest
-  scopes) that links into the page filtered to that device.
+  (utilization, in-use/free/reserved/pending, **bad/conflict addresses**, state). Each
+  scope has a **graph detail page** (timeframe thumbnail strip + custom From/To range) and
+  a **6-hour hover preview** on its graph button — all served by the package's own route,
+  no core graph files. The device **Overview tab** carries a compact summary (scope counts,
+  warning / critical tallies, busiest scopes) that links into the page filtered to that device.
 - **Server-level** → LibreNMS **sensors**, so they appear on the built-in **Health tab**
   with graphs + thresholds + native alerting:
   - `percent` — overall address utilization
@@ -133,17 +134,31 @@ Then open **Plugins → DHCP Scopes** (full scope browser), the device → **Ove
 | `lnms windows-dhcp:poll [--device=] [--group=]` | Poll DHCP servers and store data |
 | `lnms windows-dhcp:configure <device> --token=…` | Set/clear PSU connection attributes |
 
+## Settings
+
+The plugin has a settings page at **Plugins → (gear) → WindowsDhcp**
+(`/plugin/settings/WindowsDhcp`) — standard LibreNMS plugin settings, no core edits:
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| Graphed series | all | Which series to draw: in use / free / pending / bad. |
+| Stack series | on | Stack in-use + free as a filled pool vs. drawing every series as a line. |
+| Scale to scope size | off | Pin the graph y-axis to the scope's size (its total address count) so fullness is shown to scale and graphs are comparable across scopes; off = auto-scale to the data. |
+| Warning (%) / Critical (%) | 80 / 95 | Utilization thresholds driving the scopes-table bar colours, the menu critical badge, the device-Overview tallies, and the utilization sensor's alert limits. |
+| PSU HTTP timeout (s) | 30 | Request timeout for the PSU `/metrics` call. |
+
 ## Alerts
 
 Importable rules (`alert_rules/windows-dhcp-alert-rules.json`): scope utilization
-warn ≥80% / crit ≥95%, "server not responding" (ACK rate 0), PSU API unreachable
-(while ICMP up), and failover not normal.
+warn ≥80% / crit ≥95% (defaults; tune via the settings above), "server not responding"
+(ACK rate 0), PSU API unreachable (while ICMP up), and failover not normal.
 
 ## Notes / roadmap
 
-- Per-scope **historical graphs** (in-use / free / pending) are recorded to RRD and shown
-  on demand from the Scopes page (click a scope's graph button). Server-level trends graph
-  natively on the Health tab.
+- Per-scope **historical graphs** (in-use / free / pending / bad) are recorded to RRD and
+  shown from the Scopes page — a 6-hour hover preview on the graph button, or its full detail
+  page (timeframe strip + custom range). Series, stacking and y-axis scaling are configurable
+  (see **Settings**). Server-level trends graph natively on the Health tab.
 - This is an early release (`v0.x`): pin it as `^0.1` so monthly upgrades pick up patch
   releases without jumping a (possibly breaking) `0.x` minor.
 - IPv4 only (matches the PSU endpoint and environment).

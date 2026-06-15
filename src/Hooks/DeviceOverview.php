@@ -6,6 +6,7 @@ use App\Models\Device;
 use App\Plugins\Hooks\DeviceOverviewHook;
 use Illuminate\Contracts\Auth\Authenticatable;
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
+use AveryAbbott\WindowsDhcp\Settings;
 
 /**
  * Adds a compact "DHCP Scopes" summary panel to the device Overview tab, shown
@@ -25,16 +26,20 @@ class DeviceOverview extends DeviceOverviewHook
         return DhcpScope::where('device_id', $device->device_id)->exists();
     }
 
-    public function data(Device $device): array
+    public function data(Device $device, array $settings = []): array
     {
+        $settings = Settings::merge($settings);
+        $warn = $settings['util_warn'];
+        $crit = $settings['util_crit'];
+
         $base = DhcpScope::where('device_id', $device->device_id);
 
         return [
             'title' => 'DHCP Scopes',
             'device' => $device,
             'total' => (clone $base)->count(),
-            'warning' => (clone $base)->where('percent_in_use', '>=', 80)->where('percent_in_use', '<', 95)->count(),
-            'critical' => (clone $base)->where('percent_in_use', '>=', 95)->count(),
+            'warning' => (clone $base)->where('percent_in_use', '>=', $warn)->where('percent_in_use', '<', $crit)->count(),
+            'critical' => (clone $base)->where('percent_in_use', '>=', $crit)->count(),
             'topScopes' => (clone $base)->orderByDesc('percent_in_use')->limit(5)->get(),
         ];
     }

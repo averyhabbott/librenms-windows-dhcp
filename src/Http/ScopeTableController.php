@@ -29,6 +29,7 @@ class ScopeTableController extends Controller
         'addresses_free' => 'dhcp_scopes.addresses_free',
         'addresses_reserved' => 'dhcp_scopes.addresses_reserved',
         'pending_offers' => 'dhcp_scopes.pending_offers',
+        'bad_addresses' => 'dhcp_scopes.bad_addresses',
         'percent_in_use' => 'dhcp_scopes.percent_in_use',
     ];
 
@@ -91,6 +92,7 @@ class ScopeTableController extends Controller
             'addresses_free' => (int) $s->addresses_free,
             'addresses_reserved' => (int) $s->addresses_reserved,
             'pending_offers' => (int) $s->pending_offers,
+            'bad_addresses' => (int) $s->bad_addresses,
             'percent_in_use' => (float) $s->percent_in_use,
         ]);
 
