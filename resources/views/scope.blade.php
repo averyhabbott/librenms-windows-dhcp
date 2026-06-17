@@ -23,7 +23,13 @@
                 &nbsp;|&nbsp;
                 {{ __('Utilization') }}: <strong>{{ number_format((float) $scope->percent_in_use, 1) }}%</strong>
                 ({{ number_format((int) $scope->addresses_in_use) }} {{ __('in use') }},
-                {{ number_format((int) $scope->addresses_free) }} {{ __('free') }})
+                {{ number_format((int) $scope->addresses_free) }} {{ __('free') }},
+                {{ number_format((int) $scope->addresses_total) }} {{ __('total') }})
+                &nbsp;|&nbsp;
+                {{ __('Reserved') }}: <strong>{{ number_format((int) $scope->addresses_reserved) }}</strong>
+                @if((int) $scope->addresses_reserved > 0)
+                    <span class="text-muted">({{ number_format((int) $scope->reservations_active) }} {{ __('active') }}, {{ number_format((int) $scope->reservations_inactive) }} {{ __('inactive') }})</span>
+                @endif
                 &nbsp;|&nbsp;
                 {{ __('Bad addresses') }}:
                 @if((int) $scope->bad_addresses > 0)

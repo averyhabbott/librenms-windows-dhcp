@@ -104,7 +104,17 @@ class PollDhcpCommand extends Command
                 $request = $request->withToken(trim((string) $token));
             }
 
-            $response = $request->get($url);
+            // Opt-in lease-enumeration scrapes. Off by default keeps the call cheap;
+            // each gated scrape on the endpoint costs per-scope lease enumeration.
+            $query = [];
+            if (! empty($this->settings['monitor_reservation_states'])) {
+                $query['reservations'] = 'true';
+            }
+            if (! empty($this->settings['monitor_declined'])) {
+                $query['declined'] = 'true';
+            }
+
+            $response = $request->get($url, $query);
 
             if (! $response->successful()) {
                 $this->warn("[{$device->hostname}] {$url} returned HTTP {$response->status()}");
@@ -170,6 +180,11 @@ class PollDhcpCommand extends Command
             // Conflicting addresses (BAD_ADDRESS / declined). Defaults to 0 when the
             // PSU endpoint predates this field, so older endpoints stay compatible.
             $bad = (int) ($s['bad_address_count'] ?? 0);
+            // Total reserved is always collected; the active/inactive split is 0
+            // unless reservation-state monitoring is on. All three are graphable.
+            $reserved = (int) ($s['addresses_reserved'] ?? 0);
+            $resActive = (int) ($s['reservations_active'] ?? 0);
+            $resInactive = (int) ($s['reservations_inactive'] ?? 0);
 
             DhcpScope::updateOrCreate(
                 ['device_id' => $device->device_id, 'scope_id' => $scopeId],
@@ -179,7 +194,10 @@ class PollDhcpCommand extends Command
                     'addresses_total' => (int) ($s['addresses_total'] ?? ($inUse + $free)),
                     'addresses_in_use' => $inUse,
                     'addresses_free' => $free,
-                    'addresses_reserved' => (int) ($s['addresses_reserved'] ?? 0),
+                    'addresses_reserved' => $reserved,
+                    // Active/inactive split; 0 unless reservation-state monitoring is on.
+                    'reservations_active' => $resActive,
+                    'reservations_inactive' => $resInactive,
                     'pending_offers' => $pending,
                     'bad_addresses' => $bad,
                     'percent_in_use' => round((float) ($s['percent_in_use'] ?? 0), 2),
@@ -191,8 +209,14 @@ class PollDhcpCommand extends Command
                     ->addDataset('inuse', 'GAUGE', 0)
                     ->addDataset('free', 'GAUGE', 0)
                     ->addDataset('pending', 'GAUGE', 0)
-                    ->addDataset('bad', 'GAUGE', 0),
-                ['inuse' => $inUse, 'free' => $free, 'pending' => $pending, 'bad' => $bad]
+                    ->addDataset('bad', 'GAUGE', 0)
+                    ->addDataset('reserved', 'GAUGE', 0)
+                    ->addDataset('resactive', 'GAUGE', 0)
+                    ->addDataset('resinactive', 'GAUGE', 0),
+                [
+                    'inuse' => $inUse, 'free' => $free, 'pending' => $pending, 'bad' => $bad,
+                    'reserved' => $reserved, 'resactive' => $resActive, 'resinactive' => $resInactive,
+                ]
             );
         }
 

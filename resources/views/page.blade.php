@@ -23,6 +23,8 @@
             <th data-column-id="addresses_in_use" data-align="right" data-header-align="right" data-width="80px">{{ __('In Use') }}</th>
             <th data-column-id="addresses_free" data-align="right" data-header-align="right" data-width="80px">{{ __('Free') }}</th>
             <th data-column-id="addresses_reserved" data-align="right" data-header-align="right" data-width="90px" data-visible="false">{{ __('Reserved') }}</th>
+            <th data-column-id="reservations_active" data-align="right" data-header-align="right" data-width="90px" data-visible="false">{{ __('Res. Active') }}</th>
+            <th data-column-id="reservations_inactive" data-align="right" data-header-align="right" data-width="100px" data-visible="false">{{ __('Res. Inactive') }}</th>
             <th data-column-id="pending_offers" data-align="right" data-header-align="right" data-width="90px" data-visible="false">{{ __('Pending') }}</th>
             <th data-column-id="bad_addresses" data-formatter="bad" data-align="right" data-header-align="right" data-width="70px" data-visible="false">{{ __('Bad') }}</th>
             <th data-column-id="percent_in_use" data-formatter="util" data-header-align="left" data-width="180px">{{ __('Utilization') }}</th>

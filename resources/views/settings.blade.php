@@ -1,5 +1,5 @@
 @php
-    $datasetLabels = ['inuse' => 'In Use', 'free' => 'Free', 'pending' => 'Pending', 'bad' => 'Bad'];
+    $datasetLabels = ['inuse' => 'In Use', 'free' => 'Free', 'pending' => 'Pending', 'bad' => 'Bad', 'reservations' => 'Reservations'];
     $selectedDatasets = $settings['graph_datasets'] ?? array_keys($datasetLabels);
 @endphp
 
@@ -26,6 +26,19 @@
                         </label>
                     @endforeach
                     <p class="help-block">{{ __('Which series to draw on the scope graphs.') }}</p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-4 control-label">{{ __('Graphing reservations') }}</label>
+                <div class="col-sm-8">
+                    <input type="hidden" name="settings[graph_reservations_split]" value="0">
+                    <label class="checkbox">
+                        <input type="checkbox" name="settings[graph_reservations_split]" value="1"
+                               @checked(! empty($settings['graph_reservations_split']))>
+                        {{ __('Graph active/inactive reservations distinctly') }}
+                    </label>
+                    <p class="help-block">{{ __('Only applies when "Reservations" is graphed above. Off: a single line for total reserved. On: separate active and inactive lines. Active/inactive read 0 unless "Monitor reservation states" is enabled below.') }}</p>
                 </div>
             </div>
 
@@ -86,6 +99,32 @@
                 <div class="col-sm-3">
                     <input type="number" min="1" max="600" id="http_timeout" class="form-control"
                            name="settings[http_timeout]" value="{{ $settings['http_timeout'] }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-4 control-label">{{ __('Monitor reservation states') }}</label>
+                <div class="col-sm-8">
+                    <input type="hidden" name="settings[monitor_reservation_states]" value="0">
+                    <label class="checkbox">
+                        <input type="checkbox" name="settings[monitor_reservation_states]" value="1"
+                               @checked(! empty($settings['monitor_reservation_states']))>
+                        {{ __('Split reserved addresses into active vs. inactive') }}
+                    </label>
+                    <p class="help-block">{{ __('Off: only the total reserved count is collected (free, from scope statistics). On: enumerates leases on scopes that have reservations to split active/inactive - adds server-side time, more so on servers with many reservations.') }}</p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-4 control-label">{{ __('Monitor declined addresses') }}</label>
+                <div class="col-sm-8">
+                    <input type="hidden" name="settings[monitor_declined]" value="0">
+                    <label class="checkbox">
+                        <input type="checkbox" name="settings[monitor_declined]" value="1"
+                               @checked(! empty($settings['monitor_declined']))>
+                        {{ __('Count bad / declined (conflict) addresses per scope') }}
+                    </label>
+                    <p class="help-block">{{ __('Off: bad-address counts stay 0. On: scans for declined/conflict leases on every scope - the heaviest scrape; adds the most server-side time on estates with many scopes.') }}</p>
                 </div>
             </div>
         </fieldset>

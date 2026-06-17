@@ -18,7 +18,9 @@ Per poll (every 5 min) it calls `GET /api/dhcp/metrics` on each DHCP server and 
 - **Per-scope** → `dhcp_scopes` table + per-scope RRD, browsable on a dedicated
   **"DHCP Scopes" plugin page** (navbar → **Plugins → DHCP Scopes**): a server-side
   paginated/searchable table that scales to thousands of scopes across all servers
-  (utilization, in-use/free/reserved/pending, **bad/conflict addresses**, state). Each
+  (utilization, in-use/free/reserved/pending, total size, state — plus opt-in
+  active/inactive **reservation states** and **bad/conflict addresses**). The total is the
+  scope's address range minus exclusions, so it doesn't move with lease churn. Each
   scope has a **graph detail page** (timeframe thumbnail strip + custom From/To range) and
   a **6-hour hover preview** on its graph button — all served by the package's own route,
   no core graph files. The device **Overview tab** carries a compact summary (scope counts,
@@ -141,11 +143,14 @@ The plugin has a settings page at **Plugins → (gear) → WindowsDhcp**
 
 | Setting | Default | Effect |
 |---------|---------|--------|
-| Graphed series | all | Which series to draw: in use / free / pending / bad. |
+| Graphed series | in use / free | Which series to draw: in use / free / pending / bad / reservations. Pending, bad and reservations are off by default. |
+| Graphing reservations | off (single line) | When "Reservations" is graphed: off draws one total-reserved line; on draws separate active and inactive lines (which read 0 unless "Monitor reservation states" is on). |
 | Stack series | on | Stack in-use + free as a filled pool vs. drawing every series as a line. |
 | Scale to scope size | off | Pin the graph y-axis to the scope's size (its total address count) so fullness is shown to scale and graphs are comparable across scopes; off = auto-scale to the data. |
 | Warning (%) / Critical (%) | 80 / 95 | Utilization thresholds driving the scopes-table bar colours, the menu critical badge, the device-Overview tallies, and the utilization sensor's alert limits. |
 | PSU HTTP timeout (s) | 30 | Request timeout for the PSU `/metrics` call. |
+| Monitor reservation states | off | Split the reserved count into active/inactive. The total reserved count is always collected for free; the split enumerates leases on scopes that have reservations, adding server-side time. |
+| Monitor declined addresses | off | Count bad/declined (conflict) addresses per scope. The heaviest scrape (scans every scope), so it adds the most collection time on estates with many scopes. |
 
 ## Alerts
 

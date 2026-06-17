@@ -13,16 +13,28 @@ use App\Models\Plugin;
  */
 class Settings
 {
-    /** Canonical dataset order also defines which series are graphable. */
-    public const DATASETS = ['inuse', 'free', 'pending', 'bad'];
+    /**
+     * Canonical order of the user-selectable graph series. 'reservations' is a
+     * meta-series: when selected it expands at draw time to either a single
+     * total-reserved line or active/inactive lines, per graph_reservations_split.
+     */
+    public const DATASETS = ['inuse', 'free', 'pending', 'bad', 'reservations'];
 
     public const DEFAULTS = [
-        'graph_datasets' => self::DATASETS,
+        // Basic graph out of the box: just the in-use/free pool. Pending, bad and
+        // reservations are opt-in series the user enables on the settings page.
+        'graph_datasets' => ['inuse', 'free'],
         'graph_stacked' => true,
         'graph_scale_to_size' => false,
+        // Draw reservations as distinct active/inactive lines vs. a single total line.
+        'graph_reservations_split' => false,
         'util_warn' => 80,
         'util_crit' => 95,
         'http_timeout' => 30,
+        // Opt-in lease-enumeration scrapes (each adds server-side time on large
+        // estates). Off by default -> cheapest poll. See windows-dhcp:poll.
+        'monitor_reservation_states' => false,
+        'monitor_declined' => false,
     ];
 
     /**
@@ -43,6 +55,7 @@ class Settings
             $s['graph_datasets'],
             $s['graph_stacked'],
             $s['graph_scale_to_size'],
+            $s['graph_reservations_split'],
         ])), 0, 8);
 
         return $bucket . '-' . $fingerprint;
@@ -72,9 +85,12 @@ class Settings
             'graph_datasets' => self::normalizeDatasets($stored['graph_datasets'] ?? null),
             'graph_stacked' => (bool) ($stored['graph_stacked'] ?? self::DEFAULTS['graph_stacked']),
             'graph_scale_to_size' => (bool) ($stored['graph_scale_to_size'] ?? self::DEFAULTS['graph_scale_to_size']),
+            'graph_reservations_split' => (bool) ($stored['graph_reservations_split'] ?? self::DEFAULTS['graph_reservations_split']),
             'util_warn' => self::percent($stored['util_warn'] ?? null, self::DEFAULTS['util_warn']),
             'util_crit' => self::percent($stored['util_crit'] ?? null, self::DEFAULTS['util_crit']),
             'http_timeout' => self::positiveInt($stored['http_timeout'] ?? null, self::DEFAULTS['http_timeout']),
+            'monitor_reservation_states' => (bool) ($stored['monitor_reservation_states'] ?? self::DEFAULTS['monitor_reservation_states']),
+            'monitor_declined' => (bool) ($stored['monitor_declined'] ?? self::DEFAULTS['monitor_declined']),
         ];
     }
 

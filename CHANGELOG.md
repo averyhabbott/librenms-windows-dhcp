@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-06-14
+## [0.1.0] - 2026-06-16
 
 Initial release.
 
@@ -26,13 +26,25 @@ Initial release.
 - **Hover preview** — hovering a scope's graph button shows a 6-hour quick-look graph, edge-
   flipping near the screen edges (like core's port-graph popups).
 - **Bad-address (conflict) tracking** — per-scope `bad_addresses` (column + RRD dataset, graphed
-  alongside in-use/free/pending) and a server-level "DHCP Bad Addresses" count sensor.
+  alongside in-use/free/pending) and a server-level "DHCP Bad Addresses" count sensor. Opt-in
+  (see **Monitor declined addresses** below); 0 when disabled.
+- **Reservation states** — per-scope `addresses_reserved` (total, always collected) plus an opt-in
+  active/inactive split (`reservations_active` / `reservations_inactive`), shown on the scope
+  detail page and as default-hidden table columns. All three are also recorded to the per-scope RRD
+  and selectable as graph series (see **Settings**).
+- **True scope size** — `addresses_total` is now the scope's address range minus its exclusion
+  ranges, instead of in-use + free. This is independent of lease churn and doesn't double-count
+  active reservations (which already sit inside the in-use count).
 - **Per-plugin Settings page** (`/plugin/settings/WindowsDhcp`, no core edits — uses the official
-  `SettingsHook`): choose which series are graphed (in use / free / pending / bad), stacked-pool
-  vs. separate lines, **scale graphs to the scope's size** (pin the y-axis to the scope's total
-  address count), utilization warning/critical thresholds, and the PSU HTTP timeout. Thresholds
-  drive the scopes-table bar colours, the menu critical badge, the device-Overview tallies, and
-  the utilization sensor's alert limits from one place.
+  `SettingsHook`): choose which series are graphed (in use / free / pending / bad / reservations —
+  the basic graph defaults to just in use + free), draw reservations as one total line or distinct
+  active/inactive lines, stacked-pool vs. separate lines, **scale graphs to the scope's size**
+  (pin the y-axis to the scope's size),
+  utilization warning/critical thresholds, the PSU HTTP timeout, and two opt-in collection toggles —
+  **Monitor reservation states** (active/inactive split) and **Monitor declined addresses** (bad/
+  conflict counts). Both are off by default because they enumerate leases on the DHCP server, which
+  adds collection time on large estates. Thresholds drive the scopes-table bar colours, the menu
+  critical badge, the device-Overview tallies, and the utilization sensor's alert limits from one place.
 - Compact DHCP scopes summary on the device Overview tab (counts, warning / critical tallies,
   busiest scopes) linking into the page filtered to that device.
 - Server-level health as LibreNMS sensors (utilization, packet rates, scope/address counts,

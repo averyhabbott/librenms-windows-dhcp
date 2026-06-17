@@ -31,17 +31,36 @@ class GraphController extends Controller
         $rrd = Rrd::name($device->hostname, ['dhcp-scope', $safe]);
 
         $settings = Settings::load();
-        $datasets = $settings['graph_datasets'];   // subset of inuse/free/pending/bad, canonical order
+        $datasets = $settings['graph_datasets'];   // subset of DATASETS, canonical order
         $stacked = $settings['graph_stacked'];
+        $split = $settings['graph_reservations_split'];
 
         // pool=true series can be stacked into a filled area (they sum to the pool);
-        // pending/bad are always lines (they're not part of the in-use/free total).
+        // every other series is a line (not part of the in-use/free total). Keyed by
+        // the concrete RRD dataset name. Reservations are lines too — active
+        // reservations already sit inside in-use, so they're never part of the pool.
         $meta = [
-            'inuse' => ['color' => '#cc0000', 'label' => 'In Use ', 'pool' => true],
-            'free' => ['color' => '#3da233', 'label' => 'Free   ', 'pool' => true],
-            'pending' => ['color' => '#0000ff', 'label' => 'Pending', 'pool' => false],
-            'bad' => ['color' => '#ff8c00', 'label' => 'Bad    ', 'pool' => false],
+            'inuse' => ['color' => '#cc0000', 'label' => 'In Use      ', 'pool' => true, 'line' => '1'],
+            'free' => ['color' => '#3da233', 'label' => 'Free        ', 'pool' => true, 'line' => '1'],
+            'pending' => ['color' => '#0000ff', 'label' => 'Pending     ', 'pool' => false, 'line' => '1'],
+            'bad' => ['color' => '#ff8c00', 'label' => 'Bad         ', 'pool' => false, 'line' => '2'],
+            'reserved' => ['color' => '#9933cc', 'label' => 'Reserved    ', 'pool' => false, 'line' => '1'],
+            'resactive' => ['color' => '#00aaaa', 'label' => 'Res Active  ', 'pool' => false, 'line' => '1'],
+            'resinactive' => ['color' => '#888888', 'label' => 'Res Inactive', 'pool' => false, 'line' => '1'],
         ];
+
+        // Expand the selected series into the concrete RRD datasets to draw. The
+        // 'reservations' meta-series becomes either a single total-reserved line or
+        // an active+inactive pair. Off => nothing reservation-related is drawn,
+        // regardless of the split toggle.
+        $draw = [];
+        foreach ($datasets as $ds) {
+            if ($ds === 'reservations') {
+                array_push($draw, ...($split ? ['resactive', 'resinactive'] : ['reserved']));
+            } else {
+                $draw[] = $ds;
+            }
+        }
 
         $options = [
             '--start', $from,
@@ -62,18 +81,18 @@ class GraphController extends Controller
             $options[] = '--rigid';
         }
 
-        foreach ($datasets as $ds) {
+        foreach ($draw as $ds) {
             $options[] = "DEF:$ds=$rrd:$ds:AVERAGE";
         }
 
         $poolStarted = false;
-        foreach ($datasets as $ds) {
+        foreach ($draw as $ds) {
             $m = $meta[$ds];
             if ($stacked && $m['pool']) {
                 $options[] = ($poolStarted ? 'STACK:' : 'AREA:') . "{$ds}{$m['color']}:{$m['label']}";
                 $poolStarted = true;
             } else {
-                $options[] = 'LINE' . ($ds === 'bad' ? '2' : '1') . ":{$ds}{$m['color']}:{$m['label']}";
+                $options[] = 'LINE' . $m['line'] . ":{$ds}{$m['color']}:{$m['label']}";
             }
             $options[] = "GPRINT:$ds:LAST:Cur\\: %6.0lf";
             $options[] = "GPRINT:$ds:MAX:Max\\: %6.0lf\\n";
