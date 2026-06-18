@@ -1,13 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AveryAbbott\WindowsDhcp\Console;
 
 use App\Models\Device;
 use App\Models\Sensor;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use LibreNMS\RRD\RrdDefinition;
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
+use AveryAbbott\WindowsDhcp\PacketRates;
 use AveryAbbott\WindowsDhcp\Settings;
 
 /**
@@ -29,6 +33,12 @@ class PollDhcpCommand extends Command
     /** poller_type marker so the core SNMP sensor poller ignores our sensors */
     private const POLLER_TYPE = 'dhcp';
     private const HTTP_TIMEOUT = 30;
+
+    /** Highest PSU metrics schema_version this poller is written against. */
+    private const SCHEMA_VERSION = 1;
+
+    /** Lock TTL (seconds) guarding a device against overlapping polls; auto-expires if a poll dies. */
+    private const POLL_LOCK_TTL = 600;
 
     /** @var array merged plugin settings (thresholds, http timeout, ...) */
     private array $settings = [];
@@ -54,7 +64,25 @@ class PollDhcpCommand extends Command
         }
 
         foreach ($devices as $device) {
-            $this->pollDevice($device);
+            // Per-device lock so a manual `--device` run and the scheduled run
+            // can't poll the same server at once (which would race the cumulative
+            // counter attribute and the (device_id, scope_id) unique index).
+            $lock = Cache::lock("windows-dhcp-poll-{$device->device_id}", self::POLL_LOCK_TTL);
+            if (! $lock->get()) {
+                $this->warn("[{$device->hostname}] poll already in progress; skipping");
+
+                continue;
+            }
+
+            // Isolate each device: one server's failure (network, bad payload,
+            // DB error) must never abort the rest of the batch.
+            try {
+                $this->pollDevice($device);
+            } catch (\Throwable $e) {
+                $this->error("[{$device->hostname}] poll failed: " . $e->getMessage());
+            } finally {
+                $lock->release();
+            }
         }
 
         return self::SUCCESS;
@@ -73,11 +101,26 @@ class PollDhcpCommand extends Command
             return;
         }
 
-        $scopeCount = $this->syncScopes($device, $data['scopes'] ?? []);
-        $rates = $this->computePacketRates($device, $data['server']['packets'] ?? []);
-        $this->syncServerSensors($device, $data, $rates);
+        // Normalise the top-level shape so a malformed payload degrades to empty
+        // collections instead of throwing on array access downstream.
+        $server = is_array($data['server'] ?? null) ? $data['server'] : [];
+        $scopes = is_array($data['scopes'] ?? null) ? $data['scopes'] : [];
 
-        $this->info("[{$device->hostname}] polled: {$scopeCount} scopes");
+        // Guard against a transient PSU cmdlet failure: the metrics endpoint
+        // returns HTTP 200 with an empty `scopes` array when scope enumeration
+        // fails server-side. Pruning then deletes every scope row for the device.
+        // If the server still reports scopes, treat the empty list as a soft
+        // failure and keep existing rows/RRD untouched.
+        $serverScopeTotal = (int) ($server['scopes_total'] ?? 0);
+        if (empty($scopes) && $serverScopeTotal > 0) {
+            $this->warn("[{$device->hostname}] PSU returned no scopes but reports {$serverScopeTotal}; keeping existing scopes");
+        } else {
+            $scopeCount = $this->syncScopes($device, $scopes);
+            $this->info("[{$device->hostname}] polled: {$scopeCount} scopes");
+        }
+
+        $rates = $this->computePacketRates($device, $server['packets'] ?? []);
+        $this->syncServerSensors($device, $data, $rates);
     }
 
     // ---- HTTP ----
@@ -96,6 +139,11 @@ class PollDhcpCommand extends Command
         $caTempFile = is_string($verify) ? $verify : null;
 
         try {
+            // No in-poll retry: Laravel's retry() throws on a 4xx (to drive the
+            // retry), which would misclassify an expired token as a transport
+            // error and lose the distinct http_401 signal. Single transient blips
+            // are absorbed at the alert layer instead — the "PSU API unreachable"
+            // rule requires 2 consecutive failed polls before firing.
             $request = Http::timeout($this->settings['http_timeout'] ?? self::HTTP_TIMEOUT)
                 ->withOptions(['verify' => $verify])
                 ->acceptJson();
@@ -117,6 +165,7 @@ class PollDhcpCommand extends Command
             $response = $request->get($url, $query);
 
             if (! $response->successful()) {
+                $this->recordError($device, 'http_' . $response->status());
                 $this->warn("[{$device->hostname}] {$url} returned HTTP {$response->status()}");
 
                 return null;
@@ -124,13 +173,25 @@ class PollDhcpCommand extends Command
 
             $json = $response->json();
             if (! is_array($json) || ! isset($json['schema_version'])) {
+                $this->recordError($device, 'bad_response');
                 $this->warn("[{$device->hostname}] unexpected response shape from {$url}");
 
                 return null;
             }
 
+            // The plugin is written against a specific schema; surface a mismatch
+            // (the documented "PSU endpoint >= v1.1.0" requirement) loudly rather
+            // than consuming a breaking newer schema silently. Parsing is
+            // best-effort (every field is defensively coerced) so we still continue.
+            if ((int) $json['schema_version'] !== self::SCHEMA_VERSION) {
+                $this->warn("[{$device->hostname}] PSU schema_version {$json['schema_version']} != supported " . self::SCHEMA_VERSION . '; parsing best-effort — update the plugin or PSU script');
+            }
+
+            $this->recordError($device, null);
+
             return $json;
         } catch (\Throwable $e) {
+            $this->recordError($device, 'transport');
             $this->warn("[{$device->hostname}] error fetching {$url}: " . $e->getMessage());
 
             return null;
@@ -168,6 +229,9 @@ class PollDhcpCommand extends Command
         $keep = [];
 
         foreach ($scopes as $s) {
+            if (! is_array($s)) {
+                continue;
+            }
             $scopeId = (string) ($s['scope_id'] ?? '');
             if ($scopeId === '') {
                 continue;
@@ -258,7 +322,8 @@ class PollDhcpCommand extends Command
         if ($server) {
             $specs[] = ['percent', 'utilization', 'utilization', 'DHCP Address Utilization',
                 round((float) ($server['percent_in_use'] ?? 0), 2),
-                $this->settings['util_crit'] ?? 95, $this->settings['util_warn'] ?? 80, null, null];
+                $this->settings['util_crit'] ?? Settings::DEFAULTS['util_crit'],
+                $this->settings['util_warn'] ?? Settings::DEFAULTS['util_warn'], null, null];
             $specs[] = ['count', 'addresses', 'addresses_in_use', 'DHCP Addresses In Use',
                 (int) ($server['addresses_in_use'] ?? 0), null, null, null, null];
             $specs[] = ['count', 'scopes', 'scopes_active', 'DHCP Active Scopes',
@@ -346,6 +411,26 @@ class PollDhcpCommand extends Command
         ]);
     }
 
+    /**
+     * Stash the last fetch outcome on the device so an auth failure / token
+     * expiry (e.g. "http_401") is diagnosable instead of looking identical to a
+     * network outage in the reachability sensor. Pass null to clear on success.
+     */
+    private function recordError(Device $device, ?string $reason): void
+    {
+        $current = (string) $device->getAttrib('dhcp_psu_last_error');
+        $new = (string) $reason;
+        if ($current === $new) {
+            return;
+        }
+
+        if ($reason === null) {
+            $device->forgetAttrib('dhcp_psu_last_error');
+        } else {
+            $device->setAttrib('dhcp_psu_last_error', $reason);
+        }
+    }
+
     // ---- RRD ----
 
     private function storeSensorRrd(Device $device, Sensor $sensor): void
@@ -388,25 +473,7 @@ class PollDhcpCommand extends Command
 
         $device->setAttrib('dhcp_psu_counters', json_encode(['ts' => $now] + $packets));
 
-        if (! is_array($last) || empty($last['ts'])) {
-            return [];
-        }
-
-        $interval = $now - (int) $last['ts'];
-        if ($interval <= 0) {
-            return [];
-        }
-
-        $rates = [];
-        foreach ($packets as $key => $value) {
-            if ($key === 'ts' || ! isset($last[$key])) {
-                continue;
-            }
-            $delta = (int) $value - (int) $last[$key];
-            $rates[$key] = $delta < 0 ? 0.0 : round($delta / $interval, 4); // guard counter reset
-        }
-
-        return $rates;
+        return PacketRates::deltas(is_array($last) ? $last : null, $packets, $now);
     }
 
     private function rrdSafe(string $value): string

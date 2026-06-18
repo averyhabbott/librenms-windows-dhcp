@@ -15,11 +15,11 @@
                     </div>
                     <div class="col-xs-4">
                         <div style="font-size: 22px;" class="{{ $warning ? 'text-warning' : 'text-muted' }}">{{ number_format($warning) }}</div>
-                        <div class="text-muted">&ge; 80%</div>
+                        <div class="text-muted">&ge; {{ $utilWarn }}%</div>
                     </div>
                     <div class="col-xs-4">
                         <div style="font-size: 22px;" class="{{ $critical ? 'text-danger' : 'text-muted' }}">{{ number_format($critical) }}</div>
-                        <div class="text-muted">&ge; 95%</div>
+                        <div class="text-muted">&ge; {{ $utilCrit }}%</div>
                     </div>
                 </div>
 
@@ -37,7 +37,7 @@
                         @foreach($topScopes as $scope)
                             @php
                                 $perc = (float) $scope->percent_in_use;
-                                $barClass = $perc >= 95 ? 'progress-bar-danger' : ($perc >= 80 ? 'progress-bar-warning' : 'progress-bar-success');
+                                $barClass = $perc >= $utilCrit ? 'progress-bar-danger' : ($perc >= $utilWarn ? 'progress-bar-warning' : 'progress-bar-success');
                             @endphp
                             <tr>
                                 <td><strong>{{ $scope->scope_id }}</strong> <span class="text-muted">{{ $scope->name }}</span></td>

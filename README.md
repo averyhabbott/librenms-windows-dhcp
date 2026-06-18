@@ -67,6 +67,44 @@ in the `netbox-windows-dhcp` repo (`netbox_windows_dhcp/psu/dhcp_api_endpoints.p
 SECTION 0) and is pushed by that plugin's "Update PSU Scripts" action. It is reachable by
 the existing `DHCPReader` App Token.
 
+### Expected `/metrics` response (schema_version 1)
+
+This plugin is written against **`schema_version: 1`**. A response whose `schema_version`
+differs is still parsed best-effort (every field is defensively coerced), but the poll logs
+a warning — update the plugin or the PSU script when you see it. The shape consumed:
+
+```jsonc
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-18T00:00:00Z",
+  "server": {                       // null/absent tolerated — server sensors are skipped
+    "uptime_seconds": 123456,
+    "scopes_total": 12,             // used to detect a transient empty-scopes response
+    "scopes_active": 11,
+    "addresses_in_use": 4096,
+    "percent_in_use": 63.5,
+    "packets": { "discovers": 0, "offers": 0, "requests": 0,
+                 "acks": 0, "nacks": 0, "declines": 0, "releases": 0 }  // cumulative
+  },
+  "scopes": [                       // each entry must be an object; non-objects are skipped
+    { "scope_id": "10.0.1.0", "name": "A", "state": "active",
+      "addresses_total": 200, "addresses_in_use": 120, "addresses_free": 80,
+      "addresses_reserved": 5, "reservations_active": 0, "reservations_inactive": 0,
+      "pending_offers": 0, "bad_address_count": 0, "percent_in_use": 60.0 }
+  ],
+  "failover": [                     // optional
+    { "name": "FO-A", "mode": "LoadBalance", "state": "normal" }
+  ]
+}
+```
+
+Resilience contract: if `scopes` is empty **but** `server.scopes_total > 0`, the poller
+treats it as a transient server-side enumeration failure and **keeps** the existing scope
+rows rather than deleting them. Counters under `server.packets` are cumulative; the poller
+derives per-second rates. The full field reference lives in the PSU repo's
+[`psu/README.md`](https://github.com/averyhabbott/netbox-windows-dhcp/blob/main/psu/README.md)
+("Response Shapes").
+
 ## Install
 
 On the **primary**:
@@ -117,9 +155,10 @@ Per-device PSU attributes can be cleared with `lnms windows-dhcp:configure <devi
 
 ```bash
 # 1. Add the DHCP server to LibreNMS as ping-only (no SNMP) via the UI or API.
-# 2. Point it at PSU:
-lnms windows-dhcp:configure dhcp01.example.com \
-     --token='<DHCPReader App Token>' \
+# 2. Point it at PSU. Avoid passing the token on the command line (shell history /
+#    process list) — pipe it on STDIN, or export DHCP_PSU_TOKEN, or omit it to be
+#    prompted. --token still works for automation but warns.
+printf '%s' '<DHCPReader App Token>' | lnms windows-dhcp:configure dhcp01.example.com --token-stdin \
      [--url=https://dhcp01.example.com:443/api/dhcp] \
      [--ca-cert=/etc/ssl/psu-ca.pem] [--no-verify]
 # 3. First poll:
@@ -148,7 +187,7 @@ The plugin has a settings page at **Plugins → (gear) → WindowsDhcp**
 | Stack series | on | Stack in-use + free as a filled pool vs. drawing every series as a line. |
 | Scale to scope size | off | Pin the graph y-axis to the scope's size (its total address count) so fullness is shown to scale and graphs are comparable across scopes; off = auto-scale to the data. |
 | Warning (%) / Critical (%) | 80 / 95 | Utilization thresholds driving the scopes-table bar colours, the menu critical badge, the device-Overview tallies, and the utilization sensor's alert limits. |
-| PSU HTTP timeout (s) | 30 | Request timeout for the PSU `/metrics` call. |
+| PSU HTTP timeout (s) | 30 | Request timeout for the PSU `/metrics` call. Raise it when the opt-in scrapes below are enabled on large estates — they enumerate leases per scope and can exceed the default, failing the whole poll. |
 | Monitor reservation states | off | Split the reserved count into active/inactive. The total reserved count is always collected for free; the split enumerates leases on scopes that have reservations, adding server-side time. |
 | Monitor declined addresses | off | Count bad/declined (conflict) addresses per scope. The heaviest scrape (scans every scope), so it adds the most collection time on estates with many scopes. |
 

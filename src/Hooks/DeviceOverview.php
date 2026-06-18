@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AveryAbbott\WindowsDhcp\Hooks;
 
 use App\Models\Device;
@@ -37,6 +39,8 @@ class DeviceOverview extends DeviceOverviewHook
         return [
             'title' => 'DHCP Scopes',
             'device' => $device,
+            'utilWarn' => $warn,
+            'utilCrit' => $crit,
             'total' => (clone $base)->count(),
             'warning' => (clone $base)->where('percent_in_use', '>=', $warn)->where('percent_in_use', '<', $crit)->count(),
             'critical' => (clone $base)->where('percent_in_use', '>=', $crit)->count(),

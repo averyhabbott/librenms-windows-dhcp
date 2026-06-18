@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AveryAbbott\WindowsDhcp\Http;
 
 use App\Http\Controllers\Controller;

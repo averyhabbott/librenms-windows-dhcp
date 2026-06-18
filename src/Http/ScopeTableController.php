@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AveryAbbott\WindowsDhcp\Http;
 
 use App\Http\Controllers\Controller;
@@ -74,14 +76,14 @@ class ScopeTableController extends Controller
             $query->orderBy('devices.hostname')->orderBy('dhcp_scopes.scope_id');
         }
 
-        $rowCount = (int) $request->get('rowCount', 25);
+        // Clamp the client-supplied page size: an unbounded rowCount lets a caller
+        // pull every scope in one query. The UI only ever sends 25-250.
+        $rowCount = max(1, min(1000, (int) $request->get('rowCount', 25)));
         $current = max(1, (int) $request->get('current', 1));
 
         $query->select('dhcp_scopes.*', 'devices.hostname as hostname', 'devices.sysName as sysName');
 
-        if ($rowCount > 0) {
-            $query->forPage($current, $rowCount);
-        }
+        $query->forPage($current, $rowCount);
 
         $rows = $query->get()->map(fn (DhcpScope $s): array => [
             'dhcp_scope_id' => (int) $s->dhcp_scope_id,

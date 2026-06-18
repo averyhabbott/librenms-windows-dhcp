@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AveryAbbott\WindowsDhcp\Http;
 
 use App\Facades\Rrd;
@@ -22,8 +24,10 @@ class GraphController extends Controller
 
         abort_unless($device && $request->user()?->can('view', $device), 403);
 
-        $width = $request->integer('width', 1000);
-        $height = $request->integer('height', 150);
+        // Clamp caller-supplied dimensions: an unbounded width/height lets any
+        // authenticated user ask rrdtool to render an enormous PNG (CPU/memory DoS).
+        $width = max(100, min(4000, $request->integer('width', 1000)));
+        $height = max(50, min(2000, $request->integer('height', 150)));
         $from = (string) $request->get('from', '-1day');
         $to = (string) $request->get('to', 'now');
 

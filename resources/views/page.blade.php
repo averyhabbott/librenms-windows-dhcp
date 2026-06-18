@@ -56,8 +56,10 @@
     // Bound via inline onmouseenter/onmouseleave in the formatter (not document
     // delegation): bootgrid calls stopPropagation() on table events, so delegated
     // handlers never fire. The popup is moved to <body> so it escapes the table's
-    // stacking context; the GraphController sends Cache-Control max-age=300, which
-    // gives the 5-minute per-image TTL for free (re-hovers reuse the cached PNG).
+    // stacking context. The preview URL carries the `cb` token (a 5-minute time
+    // bucket + settings fingerprint, see Settings::graphCacheToken), so the browser
+    // reuses the cached PNG within a poll window — GraphController sends no cache
+    // headers itself (matching core LibreNMS).
     var HOVER_DELAY = 300;
     var hoverTimer = null;
     var $preview = null;

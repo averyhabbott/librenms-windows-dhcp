@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use AveryAbbott\WindowsDhcp\Http\GraphController;
 use AveryAbbott\WindowsDhcp\Http\ScopeDetailController;
 use AveryAbbott\WindowsDhcp\Http\ScopeTableController;

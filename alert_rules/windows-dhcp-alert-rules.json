@@ -19,7 +19,8 @@
   {
     "name": "Windows DHCP PSU API unreachable",
     "severity": "critical",
-    "notes": "Device responds to ICMP but its PowerShell Universal API is not answering.",
+    "extra": "{\"count\": 2}",
+    "notes": "Device responds to ICMP but its PowerShell Universal API is not answering. Requires two consecutive failed polls so a single transient blip (after the poller's own retry) does not flap.",
     "builder": {"condition":"AND","rules":[{"id":"sensors.sensor_descr","field":"sensors.sensor_descr","type":"string","input":"text","operator":"equal","value":"DHCP PSU API Reachable"},{"id":"sensors.sensor_current","field":"sensors.sensor_current","type":"string","input":"text","operator":"equal","value":"0"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
   },
   {

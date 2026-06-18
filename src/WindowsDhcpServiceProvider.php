@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AveryAbbott\WindowsDhcp;
 
 use App\Facades\LibrenmsConfig;
@@ -50,6 +52,9 @@ class WindowsDhcpServiceProvider extends ServiceProvider
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $pollerFreq = (int) LibrenmsConfig::get('service_poller_frequency', 300);
             $groups = (string) LibrenmsConfig::get('distributed_poller_group', '0');
+            // Laravel has no arbitrary everySeconds(int); map the frequency onto a
+            // supported named helper (sub-minute) or a minute-granular cron string.
+            $freq = PollSchedule::frequency($pollerFreq);
 
             foreach (explode(',', $groups) as $group) {
                 $group = trim($group);
@@ -57,10 +62,13 @@ class WindowsDhcpServiceProvider extends ServiceProvider
                     continue;
                 }
 
-                $schedule->command("windows-dhcp:poll --group={$group}")
-                    ->everySeconds($pollerFreq)
-                    ->withoutOverlapping()
-                    ->runInBackground();
+                $event = $schedule->command("windows-dhcp:poll --group={$group}");
+                if (isset($freq['cron'])) {
+                    $event->cron($freq['cron']);
+                } else {
+                    $event->{$freq['method']}();
+                }
+                $event->withoutOverlapping()->runInBackground();
             }
         });
     }

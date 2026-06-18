@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Production-readiness hardening.
+
+### Added
+
+- Per-device poll isolation: one server's failure (network, malformed payload, DB
+  error) no longer aborts the rest of the batch.
+- Per-device lock around polling so a manual `--device` run and the scheduled run
+  can't poll the same server concurrently (avoids racing the cumulative counter
+  attribute and the scope unique index).
+- Transient-failure guard: when the PSU returns an empty `scopes` list but still
+  reports `scopes_total > 0`, existing scope rows are kept instead of being pruned.
+- A 2-poll count gate on the "PSU API unreachable" alert rule so a single transient
+  poll failure doesn't flap (mirrors the existing "no ACKs" rule).
+- `dhcp_psu_last_error` device attribute recording the last failure class (e.g.
+  `http_401`) so an expired/invalid token is diagnosable, not masked as an outage.
+- `schema_version` is now validated (supported: `1`) and logs a warning on mismatch.
+- `--token-stdin` option and `DHCP_PSU_TOKEN` env var, plus an interactive hidden
+  prompt, so the PSU token need not be passed on the command line.
+- PHPUnit test suite: unit tests for settings validation and packet-rate math
+  (standalone), and feature tests for the poll command (run within LibreNMS).
+- Documented the expected `/metrics` response schema in the README.
+
+### Changed
+
+- Clamped caller-supplied graph `width`/`height` and the scopes-table `rowCount` to
+  bound resource use from authenticated requests.
+- Device-overview utilization tallies/bars now follow the configured warn/crit
+  thresholds instead of hardcoded 80/95.
+
 ## [0.1.0] - 2026-06-16
 
 Initial release.
