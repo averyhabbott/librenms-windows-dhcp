@@ -2,6 +2,7 @@
 
 namespace AveryAbbott\WindowsDhcp;
 
+use App\Facades\LibrenmsConfig;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 use LibreNMS\Interfaces\Plugins\PluginManagerInterface;
@@ -44,12 +45,23 @@ class WindowsDhcpServiceProvider extends ServiceProvider
             // plugin manager unavailable (e.g. during early install) — ignore
         }
 
-        // Schedule the poll every 5 minutes (LibreNMS runs `artisan schedule:run`).
+        // Schedule polling per-group (if distributed) or once for all devices (default group 0).
+        // Interval respects LibreNMS's configured polling frequency.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
-            $schedule->command('windows-dhcp:poll')
-                ->everyFiveMinutes()
-                ->withoutOverlapping()
-                ->runInBackground();
+            $pollerFreq = (int) LibrenmsConfig::get('service_poller_frequency', 300);
+            $groups = (string) LibrenmsConfig::get('distributed_poller_group', '0');
+
+            foreach (explode(',', $groups) as $group) {
+                $group = trim($group);
+                if ($group === '') {
+                    continue;
+                }
+
+                $schedule->command("windows-dhcp:poll --group={$group}")
+                    ->everySeconds($pollerFreq)
+                    ->withoutOverlapping()
+                    ->runInBackground();
+            }
         });
     }
 

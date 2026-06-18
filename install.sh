@@ -12,7 +12,6 @@
 #
 #   sudo ./install.sh --primary                 # on the primary (does DB work)
 #   sudo ./install.sh                           # on a poller (files only)
-#   sudo ./install.sh --primary --group 2       # primary that also polls group 2
 #   sudo ./install.sh --dev-path "$PWD"         # install from a local checkout
 #                                               #   (testing, before Packagist publish)
 #
@@ -20,7 +19,6 @@
 #   --librenms DIR    LibreNMS install dir   (default: /opt/librenms or $LIBRENMS_DIR)
 #   --user USER       LibreNMS unix user     (default: librenms or $LIBRENMS_USER)
 #   --primary         Run migrations + enable the plugin (run once, on the primary)
-#   --group N         Install a /etc/cron.d entry polling only poller_group N
 #   --constraint C    composer version constraint (default: ^0.1)
 #   --dev-path PATH   Resolve from a local path repo instead of Packagist (dev/testing)
 #
@@ -29,7 +27,6 @@ set -euo pipefail
 LIBRENMS_DIR="${LIBRENMS_DIR:-/opt/librenms}"
 LIBRENMS_USER="${LIBRENMS_USER:-librenms}"
 PRIMARY=0
-GROUP=""
 DEV_PATH=""
 CONSTRAINT="^0.1"
 PKG_NAME="averyhabbott/librenms-windows-dhcp"
@@ -40,7 +37,6 @@ while [[ $# -gt 0 ]]; do
         --librenms)   LIBRENMS_DIR="$2"; shift 2 ;;
         --user)       LIBRENMS_USER="$2"; shift 2 ;;
         --primary)    PRIMARY=1; shift ;;
-        --group)      GROUP="$2"; shift 2 ;;
         --constraint) CONSTRAINT="$2"; shift 2 ;;
         --dev-path)   DEV_PATH="$2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -111,17 +107,9 @@ if [[ "$PRIMARY" == "1" ]]; then
     echo "     alert_rules/windows-dhcp-alert-rules.json"
 fi
 
-# 5. Distributed pollers: per-group cron so each poller handles its own devices.
-#    Omit --group to let the primary's scheduler poll everything centrally.
-if [[ -n "$GROUP" ]]; then
-    CRON=/etc/cron.d/librenms-windows-dhcp
-    echo ">> Installing poller cron ($CRON) for poller_group $GROUP"
-    printf '*/5 * * * * %s %s windows-dhcp:poll --group=%s >/dev/null 2>&1\n' \
-        "$LIBRENMS_USER" "$LIBRENMS_DIR/lnms" "$GROUP" > "$CRON"
-fi
-
 echo ">> Done."
 echo "   Add a DHCP server (ping-only / SNMP-disabled) in LibreNMS, then:"
 echo "     $LIBRENMS_DIR/lnms windows-dhcp:configure <hostname> --token=<DHCPReader token>"
 echo "     $LIBRENMS_DIR/lnms windows-dhcp:poll --device=<hostname>"
-echo "   Without --group, collection runs via the LibreNMS scheduler (every 5 min)."
+echo "   Collection runs via the LibreNMS scheduler at its configured polling interval."
+echo "   Distributed pollers auto-detect their assigned groups via distributed_poller_group."
