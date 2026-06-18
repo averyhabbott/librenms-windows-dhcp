@@ -117,20 +117,19 @@ On each **distributed poller** (only if PSU endpoints are reachable only from th
 otherwise the primary's scheduler polls everything centrally):
 
 ```bash
-sudo ./install.sh --group <poller_group_id>
+sudo ./install.sh
+```
+
+Then, on the primary, configure the scheduler to route polls by group:
+
+```bash
+lnms config:set distributed_poller_group "0,1,2"
 ```
 
 The installer records the package in `composer.plugins.json` (git-ignored), runs composer,
 and on `--primary` runs migrations and enables the plugin. Because LibreNMS's monthly
 `daily.sh` re-requires everything in `composer.plugins.json` from Packagist, the plugin is
 **zero-touch across upgrades** — no need to re-run the installer after each update.
-
-Before the package is published to Packagist (or to install from a local checkout), point
-composer at the working copy instead:
-
-```bash
-sudo ./install.sh --primary --dev-path "$PWD"
-```
 
 Optionally import the alert rules in `alert_rules/windows-dhcp-alert-rules.json` via
 **Alerts → Alert Rules → Create → Import**.

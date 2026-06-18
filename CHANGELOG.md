@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-18
+
 Production-readiness hardening.
 
 ### Added
@@ -90,4 +92,6 @@ Initial release.
   via a `cb` token (a 5-minute time bucket plus a fingerprint of the graph settings), so graphs
   are browser-cacheable within a poll window but refetch immediately when a setting changes.
 
+[Unreleased]: https://github.com/averyhabbott/librenms-windows-dhcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/averyhabbott/librenms-windows-dhcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/averyhabbott/librenms-windows-dhcp/releases/tag/v0.1.0
