@@ -90,13 +90,19 @@ class PollDhcpCommand extends Command
 
     private function pollDevice(Device $device): void
     {
+        // Stamp the attempt at the top, before any fetch.
+        $device->setAttrib('dhcp_psu_last_poll_attempt', now()->toDateTimeString());
+
         $data = $this->fetchMetrics($device);
+        $pollError = null;
 
         // PSU reachability is recorded every run, independent of ICMP up/down
         $this->recordReachability($device, $data !== null);
 
         if ($data === null) {
             $this->warn("[{$device->hostname}] PSU metrics endpoint unreachable");
+            $pollError = 'unreachable';
+            $this->finalizeAttributes($device, $pollError);
 
             return;
         }
@@ -105,6 +111,14 @@ class PollDhcpCommand extends Command
         // collections instead of throwing on array access downstream.
         $server = is_array($data['server'] ?? null) ? $data['server'] : [];
         $scopes = is_array($data['scopes'] ?? null) ? $data['scopes'] : [];
+
+        // Check for schema mismatch and set/clear the attribute accordingly.
+        $schemaVersion = (int) ($data['schema_version'] ?? null);
+        if ($schemaVersion !== self::SCHEMA_VERSION) {
+            $device->setAttrib('dhcp_psu_schema_mismatch', "schema_version {$schemaVersion} != " . self::SCHEMA_VERSION);
+        } else {
+            $device->forgetAttrib('dhcp_psu_schema_mismatch');
+        }
 
         // Guard against a transient PSU cmdlet failure: the metrics endpoint
         // returns HTTP 200 with an empty `scopes` array when scope enumeration
@@ -121,10 +135,19 @@ class PollDhcpCommand extends Command
 
         $rates = $this->computePacketRates($device, $server['packets'] ?? []);
         $this->syncServerSensors($device, $data, $rates);
+
+        // Stamp success at the very end, after all pipeline stages complete.
+        $device->setAttrib('dhcp_psu_last_poll_success', now()->toDateTimeString());
+        $this->finalizeAttributes($device, null);
     }
 
     // ---- HTTP ----
 
+    /**
+     * Fetch metrics from the PSU endpoint. Returns the parsed JSON on success,
+     * null on any failure. Sets NONE of the error attributes — those are
+     * centralized in finalizeAttributes for deduplication.
+     */
     private function fetchMetrics(Device $device): ?array
     {
         $base = $device->getAttrib('dhcp_psu_url');
@@ -165,7 +188,6 @@ class PollDhcpCommand extends Command
             $response = $request->get($url, $query);
 
             if (! $response->successful()) {
-                $this->recordError($device, 'http_' . $response->status());
                 $this->warn("[{$device->hostname}] {$url} returned HTTP {$response->status()}");
 
                 return null;
@@ -173,7 +195,6 @@ class PollDhcpCommand extends Command
 
             $json = $response->json();
             if (! is_array($json) || ! isset($json['schema_version'])) {
-                $this->recordError($device, 'bad_response');
                 $this->warn("[{$device->hostname}] unexpected response shape from {$url}");
 
                 return null;
@@ -187,11 +208,8 @@ class PollDhcpCommand extends Command
                 $this->warn("[{$device->hostname}] PSU schema_version {$json['schema_version']} != supported " . self::SCHEMA_VERSION . '; parsing best-effort — update the plugin or PSU script');
             }
 
-            $this->recordError($device, null);
-
             return $json;
         } catch (\Throwable $e) {
-            $this->recordError($device, 'transport');
             $this->warn("[{$device->hostname}] error fetching {$url}: " . $e->getMessage());
 
             return null;
@@ -250,12 +268,15 @@ class PollDhcpCommand extends Command
             $resActive = (int) ($s['reservations_active'] ?? 0);
             $resInactive = (int) ($s['reservations_inactive'] ?? 0);
 
+            $total = (int) ($s['addresses_total'] ?? ($inUse + $free));
+            $badPercent = $total > 0 ? round((float) ($bad / $total * 100), 2) : 0;
+
             DhcpScope::updateOrCreate(
                 ['device_id' => $device->device_id, 'scope_id' => $scopeId],
                 [
                     'name' => $s['name'] ?? null,
                     'state' => $s['state'] ?? null,
-                    'addresses_total' => (int) ($s['addresses_total'] ?? ($inUse + $free)),
+                    'addresses_total' => $total,
                     'addresses_in_use' => $inUse,
                     'addresses_free' => $free,
                     'addresses_reserved' => $reserved,
@@ -264,6 +285,7 @@ class PollDhcpCommand extends Command
                     'reservations_inactive' => $resInactive,
                     'pending_offers' => $pending,
                     'bad_addresses' => $bad,
+                    'bad_percent' => $badPercent,
                     'percent_in_use' => round((float) ($s['percent_in_use'] ?? 0), 2),
                 ]
             );
@@ -332,7 +354,7 @@ class PollDhcpCommand extends Command
                 (int) ($server['scopes_total'] ?? 0), null, null, null, null];
             if (isset($server['uptime_seconds'])) {
                 $specs[] = ['runtime', 'uptime', 'uptime', 'DHCP Server Uptime',
-                    (int) $server['uptime_seconds'], null, null, null, null];
+                    (int) round(((int) $server['uptime_seconds']) / 60), null, null, null, null];
             }
         }
 
@@ -350,6 +372,14 @@ class PollDhcpCommand extends Command
             $specs[] = ['count', 'packet_rate', "rate_{$pkt}", 'DHCP ' . ucfirst($pkt) . '/sec',
                 $rates[$pkt] ?? null, null, null, null, null];
         }
+
+        // NACK ratio: percentage of ack/nack decisions that were rejected (NACKs).
+        // Denominator is acks+nacks (total ack/nack decisions), not requests (some get
+        // neither). 0 when the server is idle (no ack/nack traffic that interval).
+        $ackTotal = ($rates['acks'] ?? 0) + ($rates['nacks'] ?? 0);
+        $nackRatio = $ackTotal > 0 ? round((float) (($rates['nacks'] ?? 0) / $ackTotal * 100), 2) : 0;
+        $specs[] = ['percent', 'nack_ratio', 'nack_ratio', 'DHCP NACK Ratio',
+            $nackRatio, null, null, null, null];
 
         // Failover relationships -> 1 (normal) / 0 (not normal); alert when below 1.
         foreach ($data['failover'] ?? [] as $fo) {
@@ -412,22 +442,24 @@ class PollDhcpCommand extends Command
     }
 
     /**
-     * Stash the last fetch outcome on the device so an auth failure / token
-     * expiry (e.g. "http_401") is diagnosable instead of looking identical to a
-     * network outage in the reachability sensor. Pass null to clear on success.
+     * Finalize poll outcome attributes. If an error occurred, write it only if
+     * it differs from what's currently stored (deduplication). On success, clear
+     * the error attribute. This is called once at the very end of pollDevice,
+     * centralizing all attribute writes.
      */
-    private function recordError(Device $device, ?string $reason): void
+    private function finalizeAttributes(Device $device, ?string $errorReason): void
     {
         $current = (string) $device->getAttrib('dhcp_psu_last_error');
-        $new = (string) $reason;
+        $new = (string) $errorReason;
+
         if ($current === $new) {
             return;
         }
 
-        if ($reason === null) {
+        if ($errorReason === null) {
             $device->forgetAttrib('dhcp_psu_last_error');
         } else {
-            $device->setAttrib('dhcp_psu_last_error', $reason);
+            $device->setAttrib('dhcp_psu_last_error', $errorReason);
         }
     }
 
