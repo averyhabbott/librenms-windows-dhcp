@@ -45,6 +45,10 @@ class DeviceOverview extends DeviceOverviewHook
             'warning' => (clone $base)->where('percent_in_use', '>=', $warn)->where('percent_in_use', '<', $crit)->count(),
             'critical' => (clone $base)->where('percent_in_use', '>=', $crit)->count(),
             'topScopes' => (clone $base)->orderByDesc('percent_in_use')->limit(5)->get(),
+            'lastPollAttempt' => $device->getAttrib('dhcp_psu_last_poll_attempt'),
+            'lastPollSuccess' => $device->getAttrib('dhcp_psu_last_poll_success'),
+            'schemaMismatch' => $device->getAttrib('dhcp_psu_schema_mismatch'),
+            'lastError' => $device->getAttrib('dhcp_psu_last_error'),
         ];
     }
 }

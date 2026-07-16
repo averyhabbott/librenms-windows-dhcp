@@ -52,6 +52,24 @@
                         </tbody>
                     </table>
                 @endif
+
+                @if($lastPollSuccess || $lastPollAttempt || $schemaMismatch || $lastError)
+                    <hr style="margin: 12px 0;">
+                    <div style="font-size: 12px;">
+                        @if($lastPollSuccess)
+                            <div>{{ __('Last polled') }}: <strong>{{ \LibreNMS\Util\Time::format($lastPollSuccess, 'byminute') }}</strong></div>
+                        @endif
+                        @if($schemaMismatch)
+                            <div class="text-warning">⚠ {{ __('Schema mismatch') }}: {{ $schemaMismatch }}</div>
+                        @endif
+                        @if($lastError)
+                            <div class="text-danger">✗ {{ __('Last error') }}: {{ $lastError }}</div>
+                        @endif
+                        @if($lastPollAttempt && !$lastPollSuccess)
+                            <div class="text-muted">{{ __('Last attempt') }}: {{ \LibreNMS\Util\Time::format($lastPollAttempt, 'byminute') }} ({{ __('incomplete') }})</div>
+                        @endif
+                    </div>
+                @endif
             </div>
         </div>
     </div>
