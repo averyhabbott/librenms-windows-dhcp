@@ -68,7 +68,15 @@ class WindowsDhcpServiceProvider extends ServiceProvider
                 } else {
                     $event->{$freq['method']}();
                 }
-                $event->withoutOverlapping()->runInBackground();
+                // Run in foreground (not runInBackground) so poll completion depends on the
+                // poll itself, not on the process-supervisor's kill-group behavior. With
+                // runInBackground, a systemd unit with KillMode=control-group kills the
+                // backgrounded poll process when schedule:run exits, orphaning RRD writes
+                // before they reach rrdcached. Foreground execution means RRD writes complete
+                // within the poll process lifetime — correctness independent of the systemd
+                // config. Trade-off: a slow PSU response (capped at HTTP_TIMEOUT) delays
+                // other scheduled tasks that tick — acceptable for observed run times.
+                $event->withoutOverlapping();
             }
         });
     }

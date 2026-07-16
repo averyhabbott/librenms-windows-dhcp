@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-16
+
+### Fixed
+
+- **RRD writes were silently lost on scheduled polls** due to systemd `KillMode=control-group`
+  killing the backgrounded poll process before RRD writes reached rrdcached. Removed
+  `runInBackground()` from the scheduled event — the poll now runs synchronously in the
+  foreground so RRD completion depends only on the poll itself, not on the process supervisor.
+  Database writes (which happen in-process before RRD) continued to work, making the data loss
+  invisible until graphing (RRD empty, database up-to-date). Affects all installations on stock
+  `librenms-scheduler.service` with no manual `KillMode` override. No action needed beyond the
+  upgrade: the installer is idempotent, and the fix ships in the code.
+- **DHCP Server Uptime sensor stored raw seconds, not minutes** — the `runtime` sensor class
+  is a minutes convention (confirmed by core's own graph template and discovery code), but the
+  plugin passed raw seconds straight through without conversion. Every reading was ~60× too
+  large, visible as impossible per-day increments on the graph (e.g. 85k "minutes" in 24 hours).
+  Now converts to minutes at the sensor spec, matching core's own convention. Existing RRD
+  history remains in the wrong scale; a visible 60× step-down at deploy time is expected and
+  self-explanatory, not worth a backfill for an informational sensor.
+
 ## [0.1.1] - 2026-06-18
 
 Production-readiness hardening.
