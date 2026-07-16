@@ -27,5 +27,17 @@
     "name": "Windows DHCP failover not normal",
     "severity": "warning",
     "builder": {"condition":"AND","rules":[{"id":"sensors.sensor_type","field":"sensors.sensor_type","type":"string","input":"text","operator":"equal","value":"failover"},{"id":"sensors.sensor_current","field":"sensors.sensor_current","type":"string","input":"text","operator":"less","value":"1"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  },
+  {
+    "name": "Windows DHCP scope high bad-address rate",
+    "severity": "warning",
+    "notes": "Per-scope bad/conflict address percentage is >= 10%. Only meaningful when the 'Monitor declined addresses' setting is enabled; inert otherwise since bad_addresses stays 0.",
+    "builder": {"condition":"AND","rules":[{"id":"dhcp_scopes.bad_percent","field":"dhcp_scopes.bad_percent","type":"string","input":"text","operator":"greater_or_equal","value":"10"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
+  },
+  {
+    "name": "Windows DHCP high NACK ratio",
+    "severity": "warning",
+    "notes": "Server-level NACK ratio (rejected of total acks+nacks) >= 5%. Fires immediately on the first poll meeting the threshold, without debounce.",
+    "builder": {"condition":"AND","rules":[{"id":"sensors.sensor_descr","field":"sensors.sensor_descr","type":"string","input":"text","operator":"equal","value":"DHCP NACK Ratio"},{"id":"sensors.sensor_current","field":"sensors.sensor_current","type":"string","input":"text","operator":"greater_or_equal","value":"5"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
   }
 ]

@@ -35,6 +35,7 @@ class DhcpScope extends Model
         'reservations_inactive',
         'pending_offers',
         'bad_addresses',
+        'bad_percent',
         'percent_in_use',
     ];
 
@@ -49,6 +50,7 @@ class DhcpScope extends Model
             'reservations_inactive' => 'integer',
             'pending_offers' => 'integer',
             'bad_addresses' => 'integer',
+            'bad_percent' => 'float',
             'percent_in_use' => 'float',
         ];
     }
