@@ -134,6 +134,10 @@ and on `--primary` runs migrations and enables the plugin. Because LibreNMS's mo
 Optionally import the alert rules in `alert_rules/windows-dhcp-alert-rules.json` via
 **Alerts → Alert Rules → Create → Import**.
 
+## Upgrade
+
+The installer is idempotent, so upgrading is as simple as downloading the latest version and re-running the install script.
+
 ## Uninstall
 
 ```bash
@@ -169,9 +173,9 @@ Then open **Plugins → DHCP Scopes** (full scope browser), the device → **Ove
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `lnms windows-dhcp:poll [--device=] [--group=]` | Poll DHCP servers and store data |
+| Command                                             | Purpose                             |
+| --------------------------------------------------- | ----------------------------------- |
+| `lnms windows-dhcp:poll [--device=] [--group=]`   | Poll DHCP servers and store data    |
 | `lnms windows-dhcp:configure <device> --token=…` | Set/clear PSU connection attributes |
 
 ## Settings
@@ -179,16 +183,16 @@ Then open **Plugins → DHCP Scopes** (full scope browser), the device → **Ove
 The plugin has a settings page at **Plugins → (gear) → WindowsDhcp**
 (`/plugin/settings/WindowsDhcp`) — standard LibreNMS plugin settings, no core edits:
 
-| Setting | Default | Effect |
-|---------|---------|--------|
-| Graphed series | in use / free | Which series to draw: in use / free / pending / bad / reservations. Pending, bad and reservations are off by default. |
-| Graphing reservations | off (single line) | When "Reservations" is graphed: off draws one total-reserved line; on draws separate active and inactive lines (which read 0 unless "Monitor reservation states" is on). |
-| Stack series | on | Stack in-use + free as a filled pool vs. drawing every series as a line. |
-| Scale to scope size | off | Pin the graph y-axis to the scope's size (its total address count) so fullness is shown to scale and graphs are comparable across scopes; off = auto-scale to the data. |
-| Warning (%) / Critical (%) | 80 / 95 | Utilization thresholds driving the scopes-table bar colours, the menu critical badge, the device-Overview tallies, and the utilization sensor's alert limits. |
-| PSU HTTP timeout (s) | 30 | Request timeout for the PSU `/metrics` call. Raise it when the opt-in scrapes below are enabled on large estates — they enumerate leases per scope and can exceed the default, failing the whole poll. |
-| Monitor reservation states | off | Split the reserved count into active/inactive. The total reserved count is always collected for free; the split enumerates leases on scopes that have reservations, adding server-side time. |
-| Monitor declined addresses | off | Count bad/declined (conflict) addresses per scope. The heaviest scrape (scans every scope), so it adds the most collection time on estates with many scopes. |
+| Setting                    | Default           | Effect                                                                                                                                                                                                   |
+| -------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Graphed series             | in use / free     | Which series to draw: in use / free / pending / bad / reservations. Pending, bad and reservations are off by default.                                                                                    |
+| Graphing reservations      | off (single line) | When "Reservations" is graphed: off draws one total-reserved line; on draws separate active and inactive lines (which read 0 unless "Monitor reservation states" is on).                                 |
+| Stack series               | on                | Stack in-use + free as a filled pool vs. drawing every series as a line.                                                                                                                                 |
+| Scale to scope size        | off               | Pin the graph y-axis to the scope's size (its total address count) so fullness is shown to scale and graphs are comparable across scopes; off = auto-scale to the data.                                  |
+| Warning (%) / Critical (%) | 80 / 95           | Utilization thresholds driving the scopes-table bar colours, the menu critical badge, the device-Overview tallies, and the utilization sensor's alert limits.                                            |
+| PSU HTTP timeout (s)       | 30                | Request timeout for the PSU`/metrics` call. Raise it when the opt-in scrapes below are enabled on large estates — they enumerate leases per scope and can exceed the default, failing the whole poll. |
+| Monitor reservation states | off               | Split the reserved count into active/inactive. The total reserved count is always collected for free; the split enumerates leases on scopes that have reservations, adding server-side time.             |
+| Monitor declined addresses | off               | Count bad/declined (conflict) addresses per scope. The heaviest scrape (scans every scope), so it adds the most collection time on estates with many scopes.                                             |
 
 ## Alerts
 
