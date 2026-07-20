@@ -20,6 +20,9 @@ class WindowsDhcpServiceProvider extends ServiceProvider
     /** Plugin name used by the PluginManager / `lnms plugin:enable`. */
     public const PLUGIN_NAME = 'WindowsDhcp';
 
+    /** Composer package name for version lookup. */
+    public const PACKAGE_NAME = 'averyhabbott/librenms-windows-dhcp';
+
     public function register(): void
     {
         $this->commands([
@@ -79,6 +82,19 @@ class WindowsDhcpServiceProvider extends ServiceProvider
                 $event->withoutOverlapping();
             }
         });
+    }
+
+    /**
+     * Get the installed plugin version from Composer.
+     */
+    public static function version(): string
+    {
+        try {
+            $version = \Composer\InstalledVersions::getVersion(self::PACKAGE_NAME);
+            return $version ?: 'unknown';
+        } catch (\Throwable) {
+            return 'unknown';
+        }
     }
 
     /**

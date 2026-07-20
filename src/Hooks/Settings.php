@@ -6,6 +6,7 @@ namespace AveryAbbott\WindowsDhcp\Hooks;
 
 use App\Plugins\Hooks\SettingsHook;
 use AveryAbbott\WindowsDhcp\Settings as SettingsStore;
+use AveryAbbott\WindowsDhcp\WindowsDhcpServiceProvider;
 
 /**
  * Plugin settings page (rendered by core at /plugin/settings/WindowsDhcp and
@@ -26,6 +27,7 @@ class Settings extends SettingsHook
         // settings straight from the DB instead: correct and idempotent.
         return [
             'settings' => SettingsStore::load(),
+            'version' => WindowsDhcpServiceProvider::version(),
         ];
     }
 }

@@ -4,7 +4,7 @@
 @endphp
 
 <div style="margin: 15px;">
-    <h3 style="margin-top: 0;">{{ $plugin_name }} {{ __('Settings') }}</h3>
+    <h3 style="margin-top: 0;">{{ $plugin_name }} {{ __('Settings') }} <small class="text-muted">v{{ $version }}</small></h3>
 
     {{-- Posts to the same URL (the core plugin.update route). --}}
     <form method="post" class="form-horizontal" style="max-width: 720px;">

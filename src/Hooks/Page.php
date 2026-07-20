@@ -8,6 +8,7 @@ use App\Models\Device;
 use App\Plugins\Hooks\PageHook;
 use AveryAbbott\WindowsDhcp\Models\DhcpScope;
 use AveryAbbott\WindowsDhcp\Settings;
+use AveryAbbott\WindowsDhcp\WindowsDhcpServiceProvider;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
 
@@ -54,6 +55,7 @@ class Page extends PageHook
             'utilWarn' => $settings['util_warn'],
             'utilCrit' => $settings['util_crit'],
             'graphCacheKey' => Settings::graphCacheToken(),
+            'version' => WindowsDhcpServiceProvider::version(),
         ];
     }
 }

@@ -8,6 +8,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.1.2] - 2026-07-16
 
+### Added
+
+- Monitoring attributes (`dhcp_psu_last_poll_attempt`, `dhcp_psu_last_poll_success`,
+  `dhcp_psu_schema_mismatch`) surfaced on the device Overview tab, so a stalled or failing
+  poll — like the RRD-write-loss bug below — is visible immediately instead of requiring a
+  multi-day investigation. `dhcp_psu_last_error` is now deduplicated, written once per poll
+  instead of repeatedly.
+- `dhcp_scopes.bad_percent` column plus a "High bad-address %" alert rule (only meaningful
+  when "Monitor declined addresses" is enabled).
+- "DHCP NACK Ratio" server sensor plus a "High NACK ratio" alert rule.
+- Plugin version now displayed next to the title on the Settings and DHCP Scopes pages,
+  sourced from Composer's installed-package metadata — useful for confirming which build a
+  given host (primary or a distributed poller) is actually running.
+
 ### Fixed
 
 - **RRD writes were silently lost on scheduled polls** due to systemd `KillMode=control-group`
@@ -112,6 +126,7 @@ Initial release.
   via a `cb` token (a 5-minute time bucket plus a fingerprint of the graph settings), so graphs
   are browser-cacheable within a poll window but refetch immediately when a setting changes.
 
-[Unreleased]: https://github.com/averyhabbott/librenms-windows-dhcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/averyhabbott/librenms-windows-dhcp/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/averyhabbott/librenms-windows-dhcp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/averyhabbott/librenms-windows-dhcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/averyhabbott/librenms-windows-dhcp/releases/tag/v0.1.0

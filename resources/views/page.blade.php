@@ -1,7 +1,7 @@
 <div class="container-fluid">
     <div class="row" style="margin: 5px 0 10px;">
         <div class="col-md-6">
-            <h3 style="margin-top: 5px;">{{ $title }}</h3>
+            <h3 style="margin-top: 5px;">{{ $title }} <small class="text-muted">v{{ $version }}</small></h3>
         </div>
         <div class="col-md-4 col-md-offset-2">
             <select id="dhcp-device-filter" class="form-control" title="Filter by DHCP server">
