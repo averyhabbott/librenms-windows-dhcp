@@ -14,11 +14,17 @@
 #   sudo ./install.sh                           # on a poller (files only)
 #   sudo ./install.sh --dev-path "$PWD"         # install from a local checkout
 #                                               #   (testing, before Packagist publish)
+#   sudo ./install.sh --primary --alert-rules   # + install the canned device group/alert rules
 #
 # Options:
 #   --librenms DIR    LibreNMS install dir   (default: /opt/librenms or $LIBRENMS_DIR)
 #   --user USER       LibreNMS unix user     (default: librenms or $LIBRENMS_USER)
 #   --primary         Run migrations + enable the plugin (run once, on the primary)
+#   --alert-rules     Install/update the canned "Windows DHCP Servers" device group and
+#                     alert rules (primary only; safe to re-run, never touches an
+#                     existing group/rule unless --force is also given)
+#   --force           With --alert-rules, hard-reset the named group/rules to their
+#                     packaged defaults, overwriting local customizations
 #   --constraint C    composer version constraint (default: ^0.1)
 #   --dev-path PATH   Resolve from a local path repo instead of Packagist (dev/testing)
 #
@@ -27,6 +33,8 @@ set -euo pipefail
 LIBRENMS_DIR="${LIBRENMS_DIR:-/opt/librenms}"
 LIBRENMS_USER="${LIBRENMS_USER:-librenms}"
 PRIMARY=0
+ALERT_RULES=0
+FORCE=0
 DEV_PATH=""
 CONSTRAINT="^0.1"
 PKG_NAME="averyhabbott/librenms-windows-dhcp"
@@ -34,11 +42,13 @@ PLUGIN_NAME="WindowsDhcp"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --librenms)   LIBRENMS_DIR="$2"; shift 2 ;;
-        --user)       LIBRENMS_USER="$2"; shift 2 ;;
-        --primary)    PRIMARY=1; shift ;;
-        --constraint) CONSTRAINT="$2"; shift 2 ;;
-        --dev-path)   DEV_PATH="$2"; shift 2 ;;
+        --librenms)    LIBRENMS_DIR="$2"; shift 2 ;;
+        --user)        LIBRENMS_USER="$2"; shift 2 ;;
+        --primary)     PRIMARY=1; shift ;;
+        --alert-rules) ALERT_RULES=1; shift ;;
+        --force)       FORCE=1; shift ;;
+        --constraint)  CONSTRAINT="$2"; shift 2 ;;
+        --dev-path)    DEV_PATH="$2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -102,9 +112,18 @@ if [[ "$PRIMARY" == "1" ]]; then
     run_as "$LIBRENMS_DIR/lnms" migrate --force
     echo ">> Enabling plugin"
     run_as "$LIBRENMS_DIR/lnms" plugin:enable "$PLUGIN_NAME" || true
-    echo ">> (Optional) import alert rules via the web UI:"
-    echo "     Alerts > Alert Rules > Create > Import"
-    echo "     alert_rules/windows-dhcp-alert-rules.json"
+
+    if [[ "$ALERT_RULES" == "1" ]]; then
+        echo ">> Installing canned device group + alert rules"
+        if [[ "$FORCE" == "1" ]]; then
+            run_as "$LIBRENMS_DIR/lnms" windows-dhcp:install-alert-rules --force
+        else
+            run_as "$LIBRENMS_DIR/lnms" windows-dhcp:install-alert-rules
+        fi
+    else
+        echo ">> (Optional) install the canned device group + alert rules:"
+        echo "     sudo ./install.sh --primary --alert-rules"
+    fi
 fi
 
 echo ">> Done."

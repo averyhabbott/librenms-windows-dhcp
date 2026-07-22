@@ -9,6 +9,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 use LibreNMS\Interfaces\Plugins\PluginManagerInterface;
 use AveryAbbott\WindowsDhcp\Console\ConfigureCommand;
+use AveryAbbott\WindowsDhcp\Console\InstallAlertRulesCommand;
 use AveryAbbott\WindowsDhcp\Console\PollDhcpCommand;
 use AveryAbbott\WindowsDhcp\Hooks\DeviceOverview;
 use AveryAbbott\WindowsDhcp\Hooks\Menu;
@@ -28,6 +29,7 @@ class WindowsDhcpServiceProvider extends ServiceProvider
         $this->commands([
             PollDhcpCommand::class,
             ConfigureCommand::class,
+            InstallAlertRulesCommand::class,
         ]);
     }
 
@@ -90,7 +92,7 @@ class WindowsDhcpServiceProvider extends ServiceProvider
     public static function version(): string
     {
         try {
-            $version = \Composer\InstalledVersions::getVersion(self::PACKAGE_NAME);
+            $version = \Composer\InstalledVersions::getPrettyVersion(self::PACKAGE_NAME);
             return $version ?: 'unknown';
         } catch (\Throwable) {
             return 'unknown';

@@ -2,11 +2,17 @@
   {
     "name": "Windows DHCP scope utilization warning",
     "severity": "warning",
+    "notes": "Uses a hand-written JOIN (adv_query) instead of the visual builder: LibreNMS resolves table joins from a static core schema snapshot that our dhcp_scopes table isn't part of, so a plain builder condition on dhcp_scopes.* silently drops the device_id join and cross-matches every device against every scope in the database. See CHANGELOG.",
+    "extra": "{\"options\":{\"override_query\":true}}",
+    "adv_query": "SELECT * FROM devices JOIN dhcp_scopes ON dhcp_scopes.device_id = devices.device_id WHERE devices.device_id = ? AND dhcp_scopes.percent_in_use >= 80 AND dhcp_scopes.percent_in_use < 95 AND devices.status = 1 AND devices.disabled = 0 AND devices.ignore = 0",
     "builder": {"condition":"AND","rules":[{"id":"dhcp_scopes.percent_in_use","field":"dhcp_scopes.percent_in_use","type":"string","input":"text","operator":"greater_or_equal","value":"80"},{"id":"dhcp_scopes.percent_in_use","field":"dhcp_scopes.percent_in_use","type":"string","input":"text","operator":"less","value":"95"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
   },
   {
     "name": "Windows DHCP scope utilization critical",
     "severity": "critical",
+    "notes": "Uses a hand-written JOIN (adv_query) instead of the visual builder: LibreNMS resolves table joins from a static core schema snapshot that our dhcp_scopes table isn't part of, so a plain builder condition on dhcp_scopes.* silently drops the device_id join and cross-matches every device against every scope in the database. See CHANGELOG.",
+    "extra": "{\"options\":{\"override_query\":true}}",
+    "adv_query": "SELECT * FROM devices JOIN dhcp_scopes ON dhcp_scopes.device_id = devices.device_id WHERE devices.device_id = ? AND dhcp_scopes.percent_in_use >= 95 AND devices.status = 1 AND devices.disabled = 0 AND devices.ignore = 0",
     "builder": {"condition":"AND","rules":[{"id":"dhcp_scopes.percent_in_use","field":"dhcp_scopes.percent_in_use","type":"string","input":"text","operator":"greater_or_equal","value":"95"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
   },
   {
@@ -31,7 +37,9 @@
   {
     "name": "Windows DHCP scope high bad-address rate",
     "severity": "warning",
-    "notes": "Per-scope bad/conflict address percentage is >= 10%. Only meaningful when the 'Monitor declined addresses' setting is enabled; inert otherwise since bad_addresses stays 0.",
+    "notes": "Per-scope bad/conflict address percentage is >= 10%. Only meaningful when the 'Monitor declined addresses' setting is enabled; inert otherwise since bad_addresses stays 0. Uses a hand-written JOIN (adv_query) instead of the visual builder: LibreNMS resolves table joins from a static core schema snapshot that our dhcp_scopes table isn't part of, so a plain builder condition on dhcp_scopes.* silently drops the device_id join and cross-matches every device against every scope in the database. See CHANGELOG.",
+    "extra": "{\"options\":{\"override_query\":true}}",
+    "adv_query": "SELECT * FROM devices JOIN dhcp_scopes ON dhcp_scopes.device_id = devices.device_id WHERE devices.device_id = ? AND dhcp_scopes.bad_percent >= 10 AND devices.status = 1 AND devices.disabled = 0 AND devices.ignore = 0",
     "builder": {"condition":"AND","rules":[{"id":"dhcp_scopes.bad_percent","field":"dhcp_scopes.bad_percent","type":"string","input":"text","operator":"greater_or_equal","value":"10"},{"id":"macros.device_up","field":"macros.device_up","type":"integer","input":"radio","operator":"equal","value":"1"}],"valid":true}
   },
   {

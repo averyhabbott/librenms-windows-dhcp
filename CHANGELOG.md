@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-22
+
+### Added
+
+- `lnms windows-dhcp:install-alert-rules` (and `install.sh --alert-rules`): installs a
+  dynamic "Windows DHCP Servers" device group (devices with the `dhcp_psu_url` attribute)
+  and the canned alert rules scoped to it, directly via Eloquent — no API token needed.
+  Idempotent by name: existing groups/rules are left untouched on re-run so local
+  customizations survive; pass `--force` to hard-reset the named group/rules to their
+  packaged defaults.
+
+### Fixed
+
+- Plugin version display showed normalized Composer version (v0.1.2.0) instead of the
+  published tag (v0.1.2). Changed from `getVersion()` to `getPrettyVersion()` for
+  human-readable display.
+- The "scope utilization warning/critical" and "high bad-address rate" alert rules could
+  fire on devices with no DHCP scopes at all. LibreNMS resolves alert-rule table joins from
+  a static core schema snapshot that our `dhcp_scopes` table isn't part of, so the visual
+  query builder silently dropped the `dhcp_scopes.device_id = devices.device_id` join —
+  turning the rule into an unrestricted cross join against every scope in the database.
+  These 3 rules now use a hand-written `adv_query` join instead. **Upgrade note:** existing
+  installs that already have these rules need
+  `lnms windows-dhcp:install-alert-rules --force` (or `install.sh --alert-rules --force`) to
+  pick up the fix — the default install is intentionally non-destructive and won't overwrite
+  an already-existing rule.
+
 ## [0.1.2] - 2026-07-16
 
 ### Added

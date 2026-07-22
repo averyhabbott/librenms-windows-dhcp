@@ -1,0 +1,6 @@
+{
+  "name": "Windows DHCP Servers",
+  "desc": "Devices configured for windows-dhcp polling (dhcp_psu_url attribute set via windows-dhcp:configure).",
+  "type": "dynamic",
+  "rules": {"condition":"AND","rules":[{"id":"devices_attribs.attrib_type","field":"devices_attribs.attrib_type","type":"string","input":"text","operator":"equal","value":"dhcp_psu_url"}],"valid":true}
+}

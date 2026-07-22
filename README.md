@@ -131,8 +131,12 @@ and on `--primary` runs migrations and enables the plugin. Because LibreNMS's mo
 `daily.sh` re-requires everything in `composer.plugins.json` from Packagist, the plugin is
 **zero-touch across upgrades** — no need to re-run the installer after each update.
 
-Optionally import the alert rules in `alert_rules/windows-dhcp-alert-rules.json` via
-**Alerts → Alert Rules → Create → Import**.
+Optionally install the canned "Windows DHCP Servers" device group and alert rules
+(no API token needed — see [Alerts](#alerts)):
+
+```bash
+sudo ./install.sh --primary --alert-rules
+```
 
 ## Upgrade
 
@@ -150,6 +154,10 @@ FORCE=1 php /opt/librenms/scripts/composer_wrapper.php remove averyhabbott/libre
 
 # 3. (optional) drop collected data — the dhcp_scopes table persists otherwise:
 #    mysql> DROP TABLE dhcp_scopes;
+
+# 4. (optional) if you ran --alert-rules, remove the "Windows DHCP Servers" device group
+#    and its alert rules via Alerts > Alert Rules and Device Groups in the UI — there's
+#    no automated uninstall for those.
 ```
 
 Per-device PSU attributes can be cleared with `lnms windows-dhcp:configure <device> --clear`.
@@ -196,9 +204,24 @@ The plugin has a settings page at **Plugins → (gear) → WindowsDhcp**
 
 ## Alerts
 
-Importable rules (`alert_rules/windows-dhcp-alert-rules.json`): scope utilization
-warn ≥80% / crit ≥95% (defaults; tune via the settings above), "server not responding"
-(ACK rate 0), PSU API unreachable (while ICMP up), and failover not normal.
+Install with `sudo ./install.sh --primary --alert-rules` (or
+`lnms windows-dhcp:install-alert-rules` directly on an already-installed plugin). This
+runs locally via Eloquent, not the HTTP API — no API token required. It creates a dynamic
+"Windows DHCP Servers" device group (devices carrying the `dhcp_psu_url` attribute) and
+scopes every rule below to that group, so they only ever evaluate against actual DHCP
+servers.
+
+Rules (`alert_rules/windows-dhcp-alert-rules.json`): scope utilization warn ≥80% / crit
+≥95% (defaults; tune via the settings above), high bad-address rate, "server not
+responding" (ACK rate 0), PSU API unreachable (while ICMP up), failover not normal, and
+high NACK ratio.
+
+Idempotent by name: re-running `--alert-rules` never touches a group/rule that already
+exists, so any customization (severity, notification/operation assignment, narrowed
+scope) survives a re-run when a newer plugin version ships additional rules. Pass
+`--force` to hard-reset the named group/rules back to their packaged defaults, e.g. to
+pick up a rule-logic fix shipped in an update — see CHANGELOG before doing this on an
+existing install, since it discards local customizations to those specific rules.
 
 ## Notes / roadmap
 
